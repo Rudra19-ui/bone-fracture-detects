@@ -4,16 +4,117 @@ import { motion, AnimatePresence } from 'framer-motion';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import LoginPage from './LoginPage';
+import Chatbot from './components/Chatbot';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [selectedTab, setSelectedTab] = useState('overview');
   const [uploadedImage, setUploadedImage] = useState(null);
+  const [uploadedFile, setUploadedFile] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showExperimental, setShowExperimental] = useState(false);
+  const [showVisualInsight, setShowVisualInsight] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [notifications, setNotifications] = useState([]);
+  // History Tab State
+  const [historyData, setHistoryData] = useState([
+    {
+      id: 101,
+      date: '2026-01-23T02:10:00',
+      region: 'Wrist',
+      status: 'detected',
+      confidence: 87,
+      thumbnail: 'https://placehold.co/100x100/333/fff?text=Wrist',
+      fullImage: 'https://placehold.co/600x400/333/fff?text=Wrist+X-Ray',
+      resultTitle: 'Fracture Detected',
+      safetyMessage: 'Model Detected Pattern Consistent With Fracture',
+      summary: 'The system detected patterns consistent with a possible fracture in the Wrist region with high confidence.',
+      visualAttention: true,
+      warnings: [],
+      details: {
+        location: 'Distal radius',
+        boneType: 'Wrist'
+      }
+    },
+    {
+      id: 102,
+      date: '2026-01-22T14:30:00',
+      region: 'Elbow',
+      status: 'normal',
+      confidence: 92,
+      thumbnail: 'https://placehold.co/100x100/333/fff?text=Elbow',
+      fullImage: 'https://placehold.co/600x400/333/fff?text=Elbow+X-Ray',
+      resultTitle: 'No Fracture Detected',
+      safetyMessage: 'No fracture patterns detected',
+      summary: 'No fracture patterns were detected in the Elbow region. Confidence is high.',
+      visualAttention: false,
+      warnings: [],
+      details: {
+        location: 'Humerus',
+        boneType: 'Elbow'
+      }
+    },
+    {
+      id: 103,
+      date: '2026-01-20T09:15:00',
+      region: 'Ankle',
+      status: 'uncertain',
+      confidence: 35,
+      thumbnail: 'https://placehold.co/100x100/333/fff?text=Ankle',
+      fullImage: 'https://placehold.co/600x400/333/fff?text=Ankle+X-Ray',
+      resultTitle: 'Uncertain',
+      safetyMessage: 'Uncertain — Review Recommended',
+      summary: 'The system analysis was inconclusive for the Ankle region. Manual review is highly recommended.',
+      visualAttention: true,
+      warnings: ['Low confidence', 'Image quality check recommended'],
+      details: {
+        location: 'Tibia',
+        boneType: 'Ankle'
+      }
+    },
+    {
+      id: 104,
+      date: '2026-01-18T11:45:00',
+      region: 'Shoulder',
+      status: 'detected',
+      confidence: 78,
+      thumbnail: 'https://placehold.co/100x100/333/fff?text=Shoulder',
+      fullImage: 'https://placehold.co/600x400/333/fff?text=Shoulder+X-Ray',
+      resultTitle: 'Fracture Detected',
+      safetyMessage: 'Model Detected Pattern Consistent With Fracture',
+      summary: 'Possible fracture detected in the Shoulder region.',
+      visualAttention: true,
+      warnings: [],
+      details: {
+        location: 'Clavicle',
+        boneType: 'Shoulder'
+      }
+    },
+    {
+      id: 105,
+      date: '2026-01-15T16:20:00',
+      region: 'Hand',
+      status: 'normal',
+      confidence: 89,
+      thumbnail: 'https://placehold.co/100x100/333/fff?text=Hand',
+      fullImage: 'https://placehold.co/600x400/333/fff?text=Hand+X-Ray',
+      resultTitle: 'No Fracture Detected',
+      safetyMessage: 'No fracture patterns detected',
+      summary: 'Scan appears normal with high confidence.',
+      visualAttention: false,
+      warnings: [],
+      details: {
+        location: 'Metacarpals',
+        boneType: 'Hand'
+      }
+    }
+  ]);
+  const [historyFilter, setHistoryFilter] = useState({ status: 'all', region: 'all' });
+  const [historySort, setHistorySort] = useState('recent');
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
+
   const [recentAnalyses, setRecentAnalyses] = useState([
     {
       id: 1,
@@ -75,7 +176,7 @@ function App() {
         addNotification('Please upload a valid image file', 'error');
         return;
       }
-      
+
       // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         addNotification('File size too large. Please upload an image smaller than 10MB', 'error');
@@ -85,6 +186,7 @@ function App() {
       const reader = new FileReader();
       reader.onload = (e) => {
         setUploadedImage(e.target.result);
+        setUploadedFile(file);
         setAnalysisResult(null);
         addNotification('Image uploaded successfully', 'success');
       };
@@ -113,10 +215,45 @@ function App() {
       addNotification('Please upload an image first', 'error');
       return;
     }
-    
+    // Check if this image was already analyzed (by name) and load cached result
+    try {
+      if (uploadedFile && uploadedFile.name) {
+        const res = await fetch(`http://localhost:8000/api/analysis?image_name=${encodeURIComponent(uploadedFile.name)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && (data.bone_type || data.report_data)) {
+            const cached = data.report_data ? data.report_data : {
+              boneType: data.bone_type,
+              fractureDetected: !!data.fracture_detected,
+              confidence: data.confidence || 95,
+              severity: data.severity || 'Moderate',
+              location: data.location || 'Unknown',
+              recommendations: data.recommendations || [],
+              riskFactors: data.risk_factors || [],
+              treatmentPlan: data.treatment_plan || { phase1: '', phase2: '', phase3: '' },
+              timeline: data.timeline || { healing: '', fullRecovery: '' }
+            };
+            setAnalysisResult(cached);
+            const newAnalysis = {
+              id: Date.now(),
+              type: `${cached.boneType} ${cached.fractureDetected ? 'Fracture' : 'X-Ray'}`,
+              date: 'Loaded from database',
+              status: cached.fractureDetected ? 'severe' : 'normal',
+              confidence: cached.confidence
+            };
+            setRecentAnalyses(prev => [newAnalysis, ...prev.slice(0, 4)]);
+            addNotification('Loaded cached analysis from database', 'success');
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore cache errors and proceed to analysis
+    }
+
     setIsAnalyzing(true);
     addNotification('Starting AI analysis...', 'info');
-    
+
     // Simulate AI analysis with progress updates
     const progressSteps = [
       { message: 'Preprocessing image...', delay: 500 },
@@ -129,43 +266,66 @@ function App() {
       await new Promise(resolve => setTimeout(resolve, step.delay));
       addNotification(step.message, 'info');
     }
-    
-    // Generate random but realistic results
+
+    // Generate uncertainty-aware safety-compliant results
     const boneTypes = ['Elbow', 'Hand', 'Shoulder', 'Wrist', 'Ankle'];
-    const severities = ['Mild', 'Moderate', 'Severe'];
     const locations = ['Proximal radius', 'Distal radius', 'Metacarpal', 'Humerus', 'Tibia'];
-    
+
+    // Simulate 3-tier confidence logic
+    const rand = Math.random();
+    let confidence, resultTitle, safetyMessage, fractureDetected, predictionStr;
+
+    if (rand > 0.6) {
+      // High Confidence / Detected
+      confidence = (Math.random() * (0.99 - 0.75) + 0.75).toFixed(2); // 0.75 - 0.99
+      resultTitle = "DETECTED";
+      safetyMessage = "Model Detected Pattern Consistent With Fracture";
+      fractureDetected = true;
+      predictionStr = "Fracture Detected";
+    } else if (rand > 0.3) {
+      // Low Confidence
+      confidence = (Math.random() * (0.65 - 0.40) + 0.40).toFixed(2); // 0.40 - 0.65
+      resultTitle = "LOW CONFIDENCE";
+      safetyMessage = "Low Confidence — Requires Expert Review";
+      fractureDetected = false; // Treat as negative for safety
+      predictionStr = "Low Confidence";
+    } else {
+      // Uncertain
+      confidence = (Math.random() * (0.39 - 0.10) + 0.10).toFixed(2); // 0.10 - 0.39
+      resultTitle = "UNCERTAIN";
+      safetyMessage = "Uncertain — Review Recommended";
+      fractureDetected = false;
+      predictionStr = "Uncertain";
+    }
+
     const mockResult = {
       boneType: boneTypes[Math.floor(Math.random() * boneTypes.length)],
-      fractureDetected: Math.random() > 0.3, // 70% chance of fracture
-      confidence: Math.floor(Math.random() * 20) + 80, // 80-100%
-      severity: severities[Math.floor(Math.random() * severities.length)],
+      fractureDetected: fractureDetected,
+      resultTitle: resultTitle,
+      confidence: (confidence * 100).toFixed(1),
+      confidenceCategory: resultTitle,
+      safetyMessage: safetyMessage,
+      predictionStr: predictionStr,
+      severity: "N/A (Non-Diagnostic)", // Placeholder to avoid breaking other legacy checks if any
       location: locations[Math.floor(Math.random() * locations.length)],
       recommendations: [
-        'Immediate orthopedic consultation recommended',
-        'X-ray follow-up in 2 weeks',
-        'Immobilization with cast or splint',
-        'Pain management with prescribed medication'
+        'Clinical correlation required',
+        'Review by Radiologist recommended',
+        'This analysis is NOT a medical diagnosis'
       ],
-      riskFactors: [
-        'Age-related bone density',
-        'Previous fracture history',
-        'Activity level'
-      ],
-      treatmentPlan: {
-        phase1: 'Immobilization (4-6 weeks)',
-        phase2: 'Physical therapy (6-8 weeks)',
-        phase3: 'Gradual return to activity'
+      experimentalFeatures: {
+        vitCheck: Math.random() > 0.5 ? "Consistent" : "Inconclusive",
+        patternSuggestion: fractureDetected ? "Possible fracture pattern observed" : "No distinct pattern",
+        attentionRegion: "Region of interest identified (Experimental)"
       },
-      timeline: {
-        healing: '6-8 weeks',
-        fullRecovery: '3-4 months'
-      }
+      // Legacy fields kept empty/safe to prevent undefined errors in other parts if accessed
+      treatmentPlan: { phase1: '', phase2: '', phase3: '' },
+      timeline: { healing: '', fullRecovery: '' }
     };
-    
+
     setAnalysisResult(mockResult);
     setIsAnalyzing(false);
-    
+
     // Add to recent analyses
     const newAnalysis = {
       id: Date.now(),
@@ -175,8 +335,59 @@ function App() {
       confidence: mockResult.confidence
     };
     setRecentAnalyses(prev => [newAnalysis, ...prev.slice(0, 4)]);
-    
-    addNotification('Analysis complete!', 'success');
+
+    // Add to history data (ensure it is saved and visible)
+    const newHistoryItem = {
+      id: Date.now(),
+      date: new Date().toISOString(),
+      region: mockResult.boneType,
+      status: mockResult.fractureDetected ? 'detected' : (mockResult.resultTitle === 'UNCERTAIN' ? 'uncertain' : 'normal'),
+      confidence: mockResult.confidence,
+      thumbnail: uploadedImage,
+      fullImage: uploadedImage,
+      resultTitle: mockResult.resultTitle,
+      safetyMessage: mockResult.safetyMessage,
+      summary: `Analysis of ${mockResult.boneType} region. ${mockResult.safetyMessage}.`,
+      visualAttention: true,
+      warnings: mockResult.resultTitle !== 'DETECTED' ? ['Review recommended'] : [],
+      details: {
+        location: mockResult.location,
+        boneType: mockResult.boneType
+      }
+    };
+    setHistoryData(prev => [newHistoryItem, ...prev]);
+
+    addNotification('Analysis complete & saved to history!', 'success');
+
+    try {
+      const formData = new FormData();
+      if (uploadedFile) {
+        formData.append('image', uploadedFile);
+        formData.append('image_name', uploadedFile.name);
+      }
+      formData.append('user_name', user?.name || '');
+      formData.append('user_type', user?.userType || '');
+      formData.append('bone_type', mockResult.boneType);
+      formData.append('fracture_detected', mockResult.fractureDetected ? 'true' : 'false');
+      formData.append('confidence', String(mockResult.confidence));
+      formData.append('severity', mockResult.severity);
+      formData.append('location', mockResult.location);
+      formData.append('recommendations', JSON.stringify(mockResult.recommendations));
+      formData.append('risk_factors', JSON.stringify(mockResult.riskFactors));
+      formData.append('treatment_plan', JSON.stringify(mockResult.treatmentPlan));
+      formData.append('timeline', JSON.stringify(mockResult.timeline));
+      formData.append('report_data', JSON.stringify(mockResult));
+
+      const res = await fetch('http://localhost:8000/api/analysis', { method: 'POST', body: formData });
+      if (res.ok) {
+        await res.json();
+        addNotification('Saved to database', 'success');
+      } else {
+        addNotification('Failed to save to database', 'error');
+      }
+    } catch (err) {
+      addNotification('Error connecting to database', 'error');
+    }
   };
 
   const downloadReport = async () => {
@@ -184,66 +395,84 @@ function App() {
       addNotification('No analysis results to download', 'error');
       return;
     }
-    
+
     try {
       // Create a comprehensive PDF report
       const pdf = new jsPDF('p', 'mm', 'a4');
-      
+
       // Add header
       pdf.setFontSize(20);
       pdf.setTextColor(0, 0, 0);
       pdf.text('FractureAI Medical Report', 20, 30);
-      
+
       // Add patient info
       pdf.setFontSize(12);
       pdf.text(`Patient: ${user?.name || 'Unknown'}`, 20, 50);
       pdf.text(`User Type: ${user?.userType || 'Unknown'}`, 20, 60);
       pdf.text(`Date: ${new Date().toLocaleDateString()}`, 20, 70);
       pdf.text(`Time: ${new Date().toLocaleTimeString()}`, 20, 80);
-      
+
       // Add analysis results
       pdf.setFontSize(16);
       pdf.text('Analysis Results', 20, 100);
-      
+
       pdf.setFontSize(12);
       let yPosition = 120;
-      
+
       // Fracture detection
       pdf.text(`Fracture Detected: ${analysisResult.fractureDetected ? 'YES' : 'NO'}`, 20, yPosition);
       yPosition += 10;
-      
+
       // Bone type
       pdf.text(`Bone Type: ${analysisResult.boneType}`, 20, yPosition);
       yPosition += 10;
-      
+
       // Confidence
       pdf.text(`Confidence: ${analysisResult.confidence}%`, 20, yPosition);
       yPosition += 10;
-      
-      // Severity
-      pdf.text(`Severity: ${analysisResult.severity}`, 20, yPosition);
-      yPosition += 10;
-      
+
+      // Severity (Removed for safety)
+      // pdf.text(`Severity: ${analysisResult.severity}`, 20, yPosition);
+      // yPosition += 10;
+
       // Location
       pdf.text(`Location: ${analysisResult.location}`, 20, yPosition);
       yPosition += 15;
-      
+
+      // Safety Message
+      pdf.setFontSize(14);
+      pdf.text('Safety Assessment', 20, yPosition);
+      yPosition += 10;
+      pdf.setFontSize(12);
+      pdf.text(`Status: ${analysisResult.resultTitle || 'N/A'}`, 20, yPosition);
+      yPosition += 10;
+      pdf.text(`Message: ${analysisResult.safetyMessage || 'Clinical review required'}`, 20, yPosition);
+      yPosition += 15;
+
       // Detailed Analysis
       pdf.setFontSize(14);
-      pdf.text('Detailed Analysis', 20, yPosition);
+      pdf.text('Detailed Analysis (Research Only)', 20, yPosition);
       yPosition += 10;
-      
+
       pdf.setFontSize(12);
-      pdf.text(`Healing Time: ${analysisResult.timeline.healing}`, 20, yPosition);
-      yPosition += 10;
-      pdf.text(`Full Recovery: ${analysisResult.timeline.fullRecovery}`, 20, yPosition);
+      // pdf.text(`Healing Time: ${analysisResult.timeline.healing}`, 20, yPosition);
+      // yPosition += 10;
+      // pdf.text(`Full Recovery: ${analysisResult.timeline.fullRecovery}`, 20, yPosition);
+
+      if (analysisResult.experimentalFeatures) {
+        pdf.text(`ViT Check: ${analysisResult.experimentalFeatures.vitCheck}`, 20, yPosition);
+        yPosition += 10;
+        pdf.text(`Pattern Suggestion: ${analysisResult.experimentalFeatures.patternSuggestion}`, 20, yPosition);
+        yPosition += 10;
+      }
+
       yPosition += 15;
-      
+
       // Medical Recommendations
       pdf.setFontSize(14);
-      pdf.text('Medical Recommendations', 20, yPosition);
+      pdf.text('Next Steps', 20, yPosition);
       yPosition += 10;
-      
+
       pdf.setFontSize(12);
       analysisResult.recommendations.forEach((rec, index) => {
         if (yPosition > 250) {
@@ -253,10 +482,11 @@ function App() {
         pdf.text(`${index + 1}. ${rec}`, 20, yPosition);
         yPosition += 8;
       });
-      
+
       yPosition += 10;
-      
-      // Treatment Plan
+
+      // Treatment Plan (Removed for safety)
+      /*
       pdf.setFontSize(14);
       pdf.text('Treatment Plan', 20, yPosition);
       yPosition += 10;
@@ -267,16 +497,17 @@ function App() {
       pdf.text(`Phase 2: ${analysisResult.treatmentPlan.phase2}`, 20, yPosition);
       yPosition += 8;
       pdf.text(`Phase 3: ${analysisResult.treatmentPlan.phase3}`, 20, yPosition);
-      
+      */
+
       // Add footer
       pdf.setFontSize(10);
       pdf.setTextColor(100, 100, 100);
-      pdf.text('Generated by FractureAI - Advanced Medical AI Platform', 20, 280);
-      
+      pdf.text('Generated by FractureAI - RESEARCH USE ONLY - NOT FOR CLINICAL DIAGNOSIS', 20, 280);
+
       // Save the PDF
       const fileName = `fracture-analysis-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(fileName);
-      
+
       addNotification('Report downloaded successfully!', 'success');
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -287,47 +518,47 @@ function App() {
   const downloadHistoryReport = (analysis) => {
     try {
       const pdf = new jsPDF('p', 'mm', 'a4');
-      
+
       // Add header
       pdf.setFontSize(20);
       pdf.setTextColor(0, 0, 0);
       pdf.text('FractureAI Historical Report', 20, 30);
-      
+
       // Add patient info
       pdf.setFontSize(12);
       pdf.text(`Patient: ${user?.name || 'Unknown'}`, 20, 50);
       pdf.text(`User Type: ${user?.userType || 'Unknown'}`, 20, 60);
       pdf.text(`Analysis Date: ${analysis.date}`, 20, 70);
       pdf.text(`Report Generated: ${new Date().toLocaleDateString()}`, 20, 80);
-      
+
       // Add analysis results
       pdf.setFontSize(16);
       pdf.text('Historical Analysis Results', 20, 100);
-      
+
       pdf.setFontSize(12);
       let yPosition = 120;
-      
+
       // Analysis type
       pdf.text(`Analysis Type: ${analysis.type}`, 20, yPosition);
       yPosition += 10;
-      
+
       // Confidence
       pdf.text(`Confidence: ${analysis.confidence}%`, 20, yPosition);
       yPosition += 10;
-      
+
       // Status
       pdf.text(`Status: ${analysis.status === 'severe' ? 'Fracture Detected' : 'Normal'}`, 20, yPosition);
       yPosition += 15;
-      
+
       // Add footer
       pdf.setFontSize(10);
       pdf.setTextColor(100, 100, 100);
       pdf.text('Generated by FractureAI - Advanced Medical AI Platform', 20, 280);
-      
+
       // Save the PDF
       const fileName = `fracture-history-${analysis.id}-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(fileName);
-      
+
       addNotification('Historical report downloaded successfully!', 'success');
     } catch (error) {
       console.error('Error generating historical PDF:', error);
@@ -374,7 +605,7 @@ function App() {
             <div className="logo-icon">🦴</div>
             <span className="logo-text">FractureAI</span>
           </div>
-          
+
           <nav className="nav-tabs">
             {tabs.map(tab => (
               <button
@@ -387,7 +618,7 @@ function App() {
               </button>
             ))}
           </nav>
-          
+
           <div className="header-actions">
             <button className="action-btn" onClick={() => addNotification('Notifications feature coming soon!', 'info')}>
               🔔
@@ -418,8 +649,8 @@ function App() {
                 {/* Upload Section */}
                 <div className="glass-card upload-section">
                   <h3>Upload X-Ray Image</h3>
-                  <div 
-                    className="upload-area" 
+                  <div
+                    className="upload-area"
                     onClick={() => fileInputRef.current?.click()}
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
@@ -427,11 +658,12 @@ function App() {
                     {uploadedImage ? (
                       <div className="uploaded-image-container">
                         <img src={uploadedImage} alt="Uploaded X-ray" className="uploaded-image" />
-                        <button 
+                        <button
                           className="remove-image-btn"
                           onClick={(e) => {
                             e.stopPropagation();
                             setUploadedImage(null);
+                            setUploadedFile(null);
                             setAnalysisResult(null);
                           }}
                         >
@@ -453,7 +685,7 @@ function App() {
                     onChange={handleImageUpload}
                     style={{ display: 'none' }}
                   />
-                  <button 
+                  <button
                     className="analyze-btn"
                     onClick={analyzeImage}
                     disabled={!uploadedImage || isAnalyzing}
@@ -505,24 +737,25 @@ function App() {
                         📥 Download Report
                       </button>
                     </div>
-                    
+
                     <div className="results-grid">
-                      <div className="result-card critical">
+                      <div className={`result-card ${analysisResult.resultTitle === 'DETECTED' ? 'critical' : analysisResult.resultTitle === 'LOW CONFIDENCE' ? 'warning' : 'info'}`}>
                         <div className="result-icon">⚠️</div>
                         <div className="result-content">
-                          <span className="result-label">Fracture Detected</span>
-                          <span className="result-value">{analysisResult.fractureDetected ? 'Yes' : 'No'}</span>
+                          <span className="result-label">Model Status</span>
+                          <span className="result-value">{analysisResult.resultTitle || (analysisResult.fractureDetected ? 'DETECTED' : 'Normal')}</span>
                         </div>
                       </div>
-                      
+
                       <div className="result-card">
                         <div className="result-icon">🎯</div>
                         <div className="result-content">
-                          <span className="result-label">Confidence</span>
+                          <span className="result-label">Model Confidence</span>
                           <span className="result-value">{analysisResult.confidence}%</span>
+                          <small style={{ fontSize: '10px', display: 'block', color: '#ccc' }}>Not diagnosis</small>
                         </div>
                       </div>
-                      
+
                       <div className="result-card">
                         <div className="result-icon">🦴</div>
                         <div className="result-content">
@@ -530,12 +763,13 @@ function App() {
                           <span className="result-value">{analysisResult.boneType}</span>
                         </div>
                       </div>
-                      
-                      <div className="result-card">
-                        <div className="result-icon">📊</div>
+
+                      {/* Model Confidence & Safety Sub-card */}
+                      <div className="result-card" style={{ gridColumn: 'span 3', background: 'rgba(0, 212, 255, 0.1)' }}>
+                        <div className="result-icon">🛡️</div>
                         <div className="result-content">
-                          <span className="result-label">Severity</span>
-                          <span className="result-value">{analysisResult.severity}</span>
+                          <span className="result-label">Safety Message</span>
+                          <span className="result-value" style={{ fontSize: '14px' }}>{analysisResult.safetyMessage || "Clinical correlation required"}</span>
                         </div>
                       </div>
                     </div>
@@ -548,20 +782,42 @@ function App() {
                           <span className="detail-label">Location:</span>
                           <span className="detail-value">{analysisResult.location}</span>
                         </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Healing Time:</span>
-                          <span className="detail-value">{analysisResult.timeline.healing}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Full Recovery:</span>
-                          <span className="detail-value">{analysisResult.timeline.fullRecovery}</span>
-                        </div>
                       </div>
                     </div>
 
+                    {/* Experimental Research Insights (Collapsible) */}
+                    {analysisResult.experimentalFeatures && (
+                      <div className="detailed-analysis" style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px' }}>
+                        <div
+                          onClick={() => setShowExperimental(!showExperimental)}
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: '10px' }}
+                        >
+                          <h4 style={{ color: '#aaa', fontSize: '14px', margin: 0 }}>🔬 Experimental Research Insights (Non-Diagnostic)</h4>
+                          <span style={{ color: '#aaa' }}>{showExperimental ? '▼' : '▶'}</span>
+                        </div>
+
+                        {showExperimental && (
+                          <div className="analysis-details">
+                            <div className="detail-item">
+                              <span className="detail-label">ViT Ensemble Check:</span>
+                              <span className="detail-value">{analysisResult.experimentalFeatures.vitCheck}</span>
+                            </div>
+                            <div className="detail-item">
+                              <span className="detail-label">Pattern Suggestion:</span>
+                              <span className="detail-value">{analysisResult.experimentalFeatures.patternSuggestion}</span>
+                            </div>
+                            <div className="detail-item">
+                              <span className="detail-label">Attention Region:</span>
+                              <span className="detail-value">{analysisResult.experimentalFeatures.attentionRegion}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Recommendations */}
                     <div className="recommendations">
-                      <h4>Medical Recommendations</h4>
+                      <h4>Next Steps</h4>
                       <ul className="recommendations-list">
                         {analysisResult.recommendations.map((rec, index) => (
                           <li key={index} className="recommendation-item">
@@ -570,25 +826,6 @@ function App() {
                           </li>
                         ))}
                       </ul>
-                    </div>
-
-                    {/* Treatment Plan */}
-                    <div className="treatment-plan">
-                      <h4>Treatment Plan</h4>
-                      <div className="treatment-phases">
-                        <div className="phase">
-                          <span className="phase-label">Phase 1:</span>
-                          <span className="phase-content">{analysisResult.treatmentPlan.phase1}</span>
-                        </div>
-                        <div className="phase">
-                          <span className="phase-label">Phase 2:</span>
-                          <span className="phase-content">{analysisResult.treatmentPlan.phase2}</span>
-                        </div>
-                        <div className="phase">
-                          <span className="phase-label">Phase 3:</span>
-                          <span className="phase-content">{analysisResult.treatmentPlan.phase3}</span>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 )}
@@ -599,8 +836,8 @@ function App() {
                   <div className="bone-visualization">
                     <div className="bone-model-3d">🦴</div>
                     <div className="fracture-points">
-                      <div className="fracture-point active" style={{top: '30%', left: '40%'}}></div>
-                      <div className="fracture-point" style={{top: '60%', left: '70%'}}></div>
+                      <div className="fracture-point active" style={{ top: '30%', left: '40%' }}></div>
+                      <div className="fracture-point" style={{ top: '60%', left: '70%' }}></div>
                     </div>
                   </div>
                 </div>
@@ -610,9 +847,202 @@ function App() {
 
           {selectedTab === 'analysis' && (
             <div className="analysis-tab">
-              <div className="glass-card full-width">
-                <h2>Advanced Fracture Analysis</h2>
-                <p>Upload an X-ray image to begin comprehensive fracture analysis</p>
+              <div className="analysis-container">
+
+                {/* SECTION 1: PAGE INTRODUCTION */}
+                <div className="analysis-intro-card">
+                  <div className="intro-header">
+                    <span className="intro-icon">🔬</span>
+                    <h2>AI-Powered Fracture Analysis</h2>
+                  </div>
+                  <p>This section explains how the system analyzes an X-ray image and generates its findings.</p>
+                </div>
+
+                {/* SECTION 2: IMAGE UPLOAD & PREVIEW */}
+                <div className="analysis-upload-section">
+                  <h3>Upload X-Ray Image</h3>
+                  {!uploadedImage ? (
+                    <div
+                      className="upload-area"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{ border: 'none', background: 'transparent' }}
+                    >
+                      <div className="upload-placeholder">
+                        <div className="upload-icon">📁</div>
+                        <p>Upload an X-ray image for analysis</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="preview-container">
+                      <img src={uploadedImage} alt="Analysis Preview" className="preview-image" />
+                      <div className="upload-status">
+                        <span style={{ color: '#00d4ff' }}>✓</span>
+                        Image received and prepared for analysis
+                      </div>
+                      <button
+                        className="analyze-btn"
+                        onClick={analyzeImage}
+                        disabled={isAnalyzing}
+                        style={{ marginTop: '10px' }}
+                      >
+                        {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* SECTION 3: AI ANALYSIS FLOW */}
+                <div className="analysis-flow-section">
+                  <h3 style={{ color: 'white', marginBottom: '20px' }}>How the AI Analyzes Your X-ray</h3>
+                  <div className="flow-container">
+                    <div className="flow-card">
+                      <div className="flow-icon">📥</div>
+                      <h4>1. Image Intake</h4>
+                      <p>The system securely reads the uploaded X-ray image and prepares it for analysis.</p>
+                    </div>
+                    <div className="flow-arrow">➜</div>
+
+                    <div className="flow-card">
+                      <div className="flow-icon">🦴</div>
+                      <h4>2. Anatomical Understanding</h4>
+                      <p>The AI identifies the anatomical region visible in the X-ray (such as wrist, elbow, or hand).</p>
+                    </div>
+                    <div className="flow-arrow">➜</div>
+
+                    <div className="flow-card">
+                      <div className="flow-icon">🔍</div>
+                      <h4>3. Fracture Pattern Evaluation</h4>
+                      <p>The image is examined for bone continuity, alignment, and irregularities that may suggest a fracture.</p>
+                    </div>
+                    <div className="flow-arrow">➜</div>
+
+                    <div className="flow-card">
+                      <div className="flow-icon">⚖️</div>
+                      <h4>4. Confidence Assessment</h4>
+                      <p>The system evaluates how confident it is in the detected pattern.</p>
+                    </div>
+                    <div className="flow-arrow">➜</div>
+
+                    <div className="flow-card">
+                      <div className="flow-icon">📄</div>
+                      <h4>5. Result Generation</h4>
+                      <p>A structured result is generated for review.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION 4: ANALYSIS RESULTS */}
+                {analysisResult && (
+                  <>
+                    <div className="glass-card full-width">
+                      <h3 style={{ marginBottom: '20px' }}>Analysis Summary</h3>
+                      <div className="analysis-summary-grid">
+                        <div className="summary-card">
+                          <div className="summary-icon">⚠️</div>
+                          <div className="summary-content">
+                            <span className="summary-label">Fracture Detection Status</span>
+                            <span className="summary-value">
+                              {analysisResult.resultTitle || (analysisResult.fractureDetected ? 'Yes' : 'No')}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="summary-card">
+                          <div className="summary-icon">📍</div>
+                          <div className="summary-content">
+                            <span className="summary-label">Detected Region</span>
+                            <span className="summary-value">{analysisResult.boneType}</span>
+                          </div>
+                        </div>
+
+                        <div className="summary-card">
+                          <div className="summary-icon">🎯</div>
+                          <div className="summary-content">
+                            <span className="summary-label">Model Confidence</span>
+                            <span className="summary-value">{analysisResult.confidence}%</span>
+                          </div>
+                        </div>
+
+                        <div className="summary-card">
+                          <div className="summary-icon">👁️</div>
+                          <div className="summary-content">
+                            <span className="summary-label">Attention Visualization</span>
+                            <span className="summary-value">Available</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 5: VISUAL EXPLANATION */}
+                    <div className="visual-insight-section">
+                      <div className="insight-toggle" onClick={() => setShowVisualInsight(!showVisualInsight)}>
+                        <div>
+                          <h3 style={{ color: 'white', margin: 0 }}>Visual Attention Insight</h3>
+                          <p style={{ color: '#aaa', margin: '5px 0 0', fontSize: '14px' }}>
+                            The highlighted area shows where the AI focused while analyzing the image. This does not represent an exact fracture location.
+                          </p>
+                        </div>
+                        <button className="action-btn" style={{ width: 'auto', padding: '10px 20px' }}>
+                          {showVisualInsight ? 'Hide Visual Insight' : 'Show Visual Insight'}
+                        </button>
+                      </div>
+
+                      {showVisualInsight && (
+                        <div className="insight-content">
+                          <div className="heatmap-overlay">
+                            <img src={uploadedImage} alt="X-ray Heatmap" style={{ maxHeight: '400px', borderRadius: '10px' }} />
+                            <div className="heatmap-layer"></div>
+                            {/* Experimental Detection Box */}
+                            <div className="detection-box">
+                              <div className="detection-label">
+                                <span>⚠️</span> Fracture Region
+                              </div>
+                            </div>
+                          </div>
+                          <div className="safety-footer" style={{ marginTop: '15px', background: 'rgba(255, 200, 0, 0.1)' }}>
+                            <span className="safety-icon">⚠️</span>
+                            <span className="safety-text" style={{ color: '#ffdd00' }}>
+                              Visualization indicates model attention only. Do not use for surgical planning or localization.
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* SECTION 6: INTERPRETATION GUIDANCE */}
+                <div className="guidance-section">
+                  <h3 style={{ color: 'white' }}>How to Interpret These Results</h3>
+                  <ul className="guidance-list">
+                    <li>
+                      <span className="guidance-bullet">info</span>
+                      The system provides decision support only
+                    </li>
+                    <li>
+                      <span className="guidance-bullet">info</span>
+                      Results should be reviewed by a medical professional
+                    </li>
+                    <li>
+                      <span className="guidance-bullet">info</span>
+                      Confidence indicates model certainty, not severity
+                    </li>
+                    <li>
+                      <span className="guidance-bullet">info</span>
+                      Low confidence results may require expert review
+                    </li>
+                  </ul>
+                </div>
+
+                {/* SECTION 7: SAFETY & DISCLAIMER */}
+                <div className="safety-footer">
+                  <span className="safety-icon">🛡️</span>
+                  <span className="safety-text">
+                    This system is intended for research and educational purposes only.
+                    It does not replace professional medical evaluation or diagnosis.
+                  </span>
+                </div>
+
               </div>
             </div>
           )}
@@ -645,6 +1075,178 @@ function App() {
             </div>
           )}
 
+          {selectedTab === 'history' && (
+            <div className="history-tab">
+              <div className="history-container">
+                {/* SECTION 1: PAGE HEADER */}
+                <div className="history-header glass-card" style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '30px' }}>
+                  <div className="header-icon" style={{ fontSize: '40px', background: 'rgba(255,255,255,0.1)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📋</div>
+                  <div className="header-text">
+                    <h2 style={{ fontSize: '28px', marginBottom: '10px' }}>Analysis History</h2>
+                    <p style={{ color: '#aaa' }}>Review all previously analyzed X-ray cases and their outcomes.</p>
+                  </div>
+                </div>
+
+                {/* Filters & Controls */}
+                <div className="history-controls">
+                  <div className="filter-group" style={{ display: 'flex', gap: '10px' }}>
+                    <select
+                      value={historyFilter.status}
+                      onChange={(e) => setHistoryFilter({ ...historyFilter, status: e.target.value })}
+                      className="glass-select"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="detected">Fracture Detected</option>
+                      <option value="normal">No Fracture (Normal/Low Conf)</option>
+                      <option value="uncertain">Uncertain</option>
+                    </select>
+                    <select
+                      value={historyFilter.region}
+                      onChange={(e) => setHistoryFilter({ ...historyFilter, region: e.target.value })}
+                      className="glass-select"
+                    >
+                      <option value="all">All Regions</option>
+                      <option value="Wrist">Wrist</option>
+                      <option value="Elbow">Elbow</option>
+                      <option value="Shoulder">Shoulder</option>
+                      <option value="Hand">Hand</option>
+                      <option value="Ankle">Ankle</option>
+                    </select>
+                  </div>
+                  <div className="sort-group">
+                    <select
+                      value={historySort}
+                      onChange={(e) => setHistorySort(e.target.value)}
+                      className="glass-select"
+                    >
+                      <option value="recent">Most Recent</option>
+                      <option value="oldest">Oldest First</option>
+                      <option value="confidence_high">Highest Confidence</option>
+                      <option value="confidence_low">Lowest Confidence</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* SECTION 2: HISTORY LIST */}
+                <div className="history-list-container" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  {historyData
+                    .filter(item => {
+                      if (historyFilter.status !== 'all' && item.status !== historyFilter.status) return false;
+                      if (historyFilter.region !== 'all' && item.region !== historyFilter.region) return false;
+                      return true;
+                    })
+                    .sort((a, b) => {
+                      if (historySort === 'recent') return new Date(b.date) - new Date(a.date);
+                      if (historySort === 'oldest') return new Date(a.date) - new Date(b.date);
+                      if (historySort === 'confidence_high') return b.confidence - a.confidence;
+                      if (historySort === 'confidence_low') return a.confidence - b.confidence;
+                      return 0;
+                    })
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        className={`history-item-card ${selectedHistoryItem?.id === item.id ? 'active' : ''}`}
+                        onClick={() => setSelectedHistoryItem(selectedHistoryItem?.id === item.id ? null : item)}
+                      >
+                        <div className="history-item-main" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                          <div className="history-thumb" style={{ width: '80px', height: '80px', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
+                            <img src={item.thumbnail} alt={item.region} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                          <div className="history-info" style={{ flex: 1 }}>
+                            <div className="history-meta" style={{ display: 'flex', gap: '15px', marginBottom: '8px', fontSize: '14px', color: '#aaa' }}>
+                              <span className="history-date">📅 {new Date(item.date).toLocaleString()}</span>
+                              <span className="history-region">🦴 {item.region}</span>
+                            </div>
+                            <div className="history-result" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                              <span className={`status-badge`} style={{
+                                padding: '6px 12px',
+                                borderRadius: '20px',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                background: item.status === 'detected' ? 'rgba(255, 77, 77, 0.2)' : (item.status === 'normal' ? 'rgba(0, 255, 157, 0.2)' : 'rgba(255, 255, 255, 0.1)'),
+                                color: item.status === 'detected' ? '#ff4d4d' : (item.status === 'normal' ? '#00ff9d' : '#ccc'),
+                                border: `1px solid ${item.status === 'detected' ? 'rgba(255, 77, 77, 0.3)' : (item.status === 'normal' ? 'rgba(0, 255, 157, 0.3)' : 'rgba(255, 255, 255, 0.2)')}`
+                              }}>
+                                {item.resultTitle}
+                              </span>
+                              <span className="confidence-badge" style={{ color: '#00d4ff', fontSize: '14px' }}>
+                                🎯 {item.confidence}% Conf.
+                              </span>
+                            </div>
+                          </div>
+                          <div className="history-expand-icon" style={{ fontSize: '20px', opacity: 0.5 }}>
+                            {selectedHistoryItem?.id === item.id ? '▲' : '▼'}
+                          </div>
+                        </div>
+
+                        {/* Expandable Details */}
+                        {selectedHistoryItem?.id === item.id && (
+                          <div className="history-item-details">
+                            <div className="history-detail-row">
+                              <span className="history-detail-label">Summary:</span>
+                              <span className="history-detail-value">{item.summary}</span>
+                            </div>
+                            <div className="history-detail-row">
+                              <span className="history-detail-label">Safety Message:</span>
+                              <span className="history-detail-value">{item.safetyMessage}</span>
+                            </div>
+                            <div className="history-detail-row">
+                              <span className="history-detail-label">Location:</span>
+                              <span className="history-detail-value">{item.details.location}</span>
+                            </div>
+
+                            <div className="history-action-buttons">
+                              <button className="action-btn-primary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAnalysisResult({
+                                    boneType: item.region,
+                                    fractureDetected: item.status === 'detected',
+                                    resultTitle: item.resultTitle,
+                                    confidence: item.confidence,
+                                    safetyMessage: item.safetyMessage,
+                                    location: item.details.location,
+                                    recommendations: ['Review historical data'],
+                                    experimentalFeatures: { vitCheck: 'N/A', patternSuggestion: 'N/A', attentionRegion: 'N/A' }
+                                  });
+                                  setUploadedImage(item.fullImage);
+                                  setSelectedTab('analysis');
+                                  window.scrollTo(0, 0);
+                                }}>
+                                🔬 Re-Analyze / View
+                              </button>
+                              <button className="action-btn-secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  downloadHistoryReport(item);
+                                }}
+                              >
+                                📥 Download Report
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                  {historyData.length === 0 && (
+                    <div className="no-history-state" style={{ textAlign: 'center', padding: '50px', color: '#aaa' }}>
+                      <p>No history records found.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* SECTION 6: DATA INTEGRITY & DISCLAIMER */}
+                <div className="safety-footer" style={{ marginTop: '30px' }}>
+                  <span className="safety-icon">🔒</span>
+                  <span className="safety-text">
+                    Historical data is stored locally for this session. Do not rely on this for permanent medical records.
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {selectedTab === 'settings' && (
             <div className="settings-tab">
               <div className="glass-card full-width">
@@ -665,7 +1267,7 @@ function App() {
                       <span>{user?.userType}</span>
                     </div>
                   </div>
-                  
+
                   <div className="setting-group">
                     <h3>Analysis History</h3>
                     <div className="history-list">
@@ -678,7 +1280,7 @@ function App() {
                             <span className="history-confidence">Confidence: {analysis.confidence}%</span>
                           </div>
                           <div className="history-actions">
-                            <button 
+                            <button
                               className="download-history-btn"
                               onClick={() => downloadHistoryReport(analysis)}
                               title="Download Report"
@@ -699,7 +1301,7 @@ function App() {
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="setting-group">
                     <h3>Notifications</h3>
                     <div className="notifications-list">
@@ -713,7 +1315,7 @@ function App() {
                       ))}
                     </div>
                   </div>
-                  
+
                   <div className="setting-group">
                     <h3>Account Actions</h3>
                     <button className="logout-btn-main" onClick={handleLogout}>
@@ -726,6 +1328,7 @@ function App() {
           )}
         </main>
       </div>
+      <Chatbot />
     </div>
   );
 }

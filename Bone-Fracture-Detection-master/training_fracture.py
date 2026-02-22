@@ -3,6 +3,7 @@ import pandas as pd
 import os.path
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
+from sklearn.utils import class_weight
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
@@ -78,9 +79,18 @@ def trainPart(part):
     # The resulting generators can then be used to train and evaluate a deep learning model.
 
     # now we have 10% test, 72% training and 18% validation
-    train_generator = tf.keras.preprocessing.image.ImageDataGenerator(horizontal_flip=True,
-                                                                      preprocessing_function=tf.keras.applications.resnet50.preprocess_input,
-                                                                      validation_split=0.2)
+    # MEDICAL PERFORMANCE PRIORITY: Augmentation
+    # Enhance robustness to subtle variations (zoom, shift, rotation)
+    train_generator = tf.keras.preprocessing.image.ImageDataGenerator(
+        preprocessing_function=tf.keras.applications.resnet50.preprocess_input,
+        validation_split=0.2,
+        rotation_range=20,
+        zoom_range=0.15,
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+        horizontal_flip=True,
+        fill_mode='nearest'
+    )
 
     # use ResNet50 architecture
     test_generator = tf.keras.preprocessing.image.ImageDataGenerator(
@@ -143,12 +153,27 @@ def trainPart(part):
     # print(model.summary())
     print("-------Training " + part + "-------")
 
+    # Calculate class weights to handle imbalance and prioritize fractures
+    # We want to penalize missing a fracture (False Negative) more than a False Positive.
+    # Typically, 'fractured' is index 0, 'normal' is index 1.
+    unique_classes = np.unique(train_df['Label'])
+    weights = class_weight.compute_class_weight('balanced', classes=unique_classes, y=train_df['Label'])
+    class_weights_dict = dict(enumerate(weights))
+    
+    # Increase weight for 'fractured' manually if needed for higher sensitivity
+    # Assuming 'fractured' is at index 0 (alphabetical)
+    # class_weights_dict[0] *= 1.2 
+    print(f"Class Weights: {class_weights_dict}")
+
     # Adam optimizer with low learning rate for better accuracy
-    model.compile(optimizer=Adam(learning_rate=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
+    # Added Recall metric for monitoring sensitivity
+    model.compile(optimizer=Adam(learning_rate=0.0001), 
+                  loss='categorical_crossentropy', 
+                  metrics=['accuracy', tf.keras.metrics.Recall(name='recall')])
 
     # early stop when our model is over fit or vanishing gradient, with restore best values
     callbacks = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
-    history = model.fit(train_images, validation_data=val_images, epochs=25, callbacks=[callbacks])
+    history = model.fit(train_images, validation_data=val_images, epochs=25, callbacks=[callbacks], class_weight=class_weights_dict)
 
     # save model to this path
     model.save(THIS_FOLDER + "/weights/ResNet50_" + part + "_frac.h5")

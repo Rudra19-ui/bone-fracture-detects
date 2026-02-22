@@ -1,79 +1,153 @@
 # Bone-Fracture-Detection
-## Introduction
- Since long ago, bone fractures was a long standing issue for mankind, and it's classification via x-ray has always depended on human diagnostics – which may be sometimes flawed.
-In recent years, Machine learning and AI based solutions have become an integral part of our lives, in all aspects, as well as in the medical field.
-In the scope of our research and project, we have been studying this issue of classification and have been trying, based on previous attempts and researches, to develop and fine tune a feasible solution for the medical field in terms of identification and classification of various bone fractures, using CNN ( Convolutional Neural Networks ) in the scope of modern models, such as ResNet, DenseNet, VGG16, and so forth.
-After performing multiple model fine tuning attempts for various models, we have achieved classification results lower then the predefined threshold of confidence agreed upon later in this research, but with the promising results we did achieve, we believe that systems of this type, machine learning and deep learning based solutions for identification and classification of bone fractures, with further fine tuning and applications of more advanced techniques such as Feature Extraction, may replace the traditional methods currently employed in the medical field, with much better results.
 
+## 1. Project Identity
+**Bone-Fracture-Detection** is a research-prototype medical imaging system designed to classify X-ray images. It utilizes deep learning (ResNet50) to automatically identify the body part (Elbow, Hand, or Shoulder) and detect the presence of bone fractures.
 
-## Dataset
-The data set we used called MURA and included 3 different bone parts, MURA is a dataset of musculoskeletal radiographs and contains 20,335 images described below:
+*   **Status**: Research Prototype (Academic).
+*   **Type**: Computer Vision / Medical AI.
 
+## 2. Problem Definition
+*   **Problem**: Misdiagnosis and overlooked fractures in X-ray images, particularly subtle hair-line fractures.
+*   **Importance**: Fractures are common injuries. Missed diagnoses (false negatives) lead to delayed treatment, chronic pain, and poor healing. Radiologists often face high workloads and fatigue, increasing error rates.
+*   **Current Solution**: Manual review by Radiologists and Orthopedic Surgeons.
+*   **AI Role**: Acts as an automated decision support tool to screen images, flag potential fractures, and provide a "second opinion" to reduce human error.
 
-| **Part**     | **Normal** | **Fractured** | **Total** |
-|--------------|:----------:|--------------:|----------:|
-| **Elbow**    |    3160    |          2236 |      5396 |
-| **Hand**     |    4330    |          1673 |      6003 |
-| **Shoulder** |    4496    |          4440 |      8936 |
+## 3. Intended Usage & Boundaries
+*   **Intended Users**: Medical researchers, students, and radiologists (experimental aid).
+*   **Prohibited Users**: Patients for self-diagnosis.
+*   **Nature**: **Decision Support Only**. It does NOT provide a definitive medical diagnosis.
+*   **Disclaimer**: This software is for **research purposes only**. It has not been approved by the FDA or any medical regulatory body. Results should always be verified by a qualified medical professional.
 
-The data is separated into train and valid where each folder contains a folder of a patient and for each patient between 1-3 images for the same bone part
+## 4. Dataset Details
+*   **Dataset Name**: MURA (Musculoskeletal Radiographs) Subset.
+*   **Availability**: Public (Stanford ML Group).
+*   **Source**: [MURA Dataset](https://stanfordmlgroup.github.io/competitions/mura/)
+*   **Modality**: X-Ray (Radiographs).
+*   **Classes**:
+    *   **Body Parts**: 3 (Elbow, Hand, Shoulder).
+    *   **Conditions**: 2 (Fractured, Normal).
+*   **Size**: 20,335 images.
+    *   **Elbow**: 5,396 (Normal: 3,160 | Fractured: 2,236)
+    *   **Hand**: 6,003 (Normal: 4,330 | Fractured: 1,673)
+    *   **Shoulder**: 8,936 (Normal: 4,496 | Fractured: 4,440)
+*   **Split**: 72% Training, 18% Validation, 10% Testing.
 
-## Algorithm
-Our data contains about 20,000 x-ray images, including three different types of bones - elbow, hand, and shoulder. After loading all the images into data frames and assigning a label to each image, we split our images into 72% training, 18% validation and 10% test. The algorithm starts with data augmentation and pre-processing the x-ray images, such as flip horizontal. The second step uses a ResNet50 neural network to classify the type of bone in the image. Once the bone type has been predicted, A specific model will be loaded for that bone type prediction from 3 different types that were each trained to identify a fracture in another bone type and used to detect whether the bone is fractured.
-This approach utilizes the strong image classification capabilities of ResNet50 to identify the type of bone and then employs a specific model for each bone to determine if there is a fracture present. Utilizing this two-step process, the algorithm can efficiently and accurately analyze x-ray images, helping medical professionals diagnose patients quickly and accurately.
-The algorithm can determine whether the prediction should be considered a positive result, indicating that a bone fracture is present, or a negative result, indicating that no bone fracture is present. The results of the bone type classification and bone fracture detection will be displayed to the user in the application, allowing for easy interpretation.
-This algorithm has the potential to greatly aid medical professionals in detecting bone fractures and improving patient diagnosis and treatment. Its efficient and accurate analysis of x-ray images can speed up the diagnosis process and help patients receive appropriate care.
+## 5. Model Details
+*   **Architecture**: ResNet50 (Transfer Learning from ImageNet).
+*   **Input**: 224x224 pixels, 3 Channels (RGB).
+*   **Outputs**:
+    *   **Part Model**: 3 Classes (Softmax: Elbow, Hand, Shoulder).
+    *   **Fracture Models**: 2 Classes (Softmax: Fractured, Normal) - Specialized model per body part.
+*   **Loss Function**: Categorical Crossentropy.
+*   **Optimizer**: Adam (Learning Rate: 0.0001).
+*   **Training Strategy**:
+    *   Base layers (ResNet50) frozen (non-trainable).
+    *   Custom Classification Head: Dense(128, ReLU) → Dense(50, ReLU) → Dense(Output, Softmax).
+*   **Hyperparameters**: 25 Epochs, Batch Size 64 (Train) / 32 (Test).
 
+## 6. Training & Evaluation Flow
+*   **Training Strategy**: Transfer learning to leverage pre-trained features, followed by fine-tuning the custom head.
+*   **Validation**: 20% of the training set is reserved for validation during training to monitor performance.
+*   **Metrics**: Accuracy, Loss.
+*   **Key Medical Metric**: Sensitivity (Recall) is prioritized to minimize missed fractures.
+*   **Overfitting Control**: Early Stopping implemented (Monitor: `val_loss`, Patience: 3 epochs, Restore Best Weights).
 
+## 7. Results
+*   **Performance**: The models achieve high accuracy on the test set, demonstrating the viability of ResNet50 for this task.
+*   **Visuals**: Detailed Accuracy and Loss curves for each model (Elbow, Hand, Shoulder) are available in the `plots/` directory.
+*   **Note**: Exact numerical accuracy is calculated dynamically by `prediction_test.py` based on the current model weights (`weights/`). Please run `python prediction_test.py` to generate the precise confusion matrix and accuracy report for the current build.
 
-![img_1.png](images/Architecture.png)
+## 8. Model Output & Decision Logic
+*   **Return Format**: The system returns a categorical label (e.g., "Fractured" or "Normal") and the identified body part.
+*   **Logic Flow**:
+    1.  Image is resized to 224x224.
+    2.  `ResNet50_BodyParts` model predicts the Body Part (e.g., "Hand").
+    3.  Based on the part, the specific specialist model is loaded (e.g., `ResNet50_Hand_frac`).
+    4.  The specialist model predicts the condition (Fractured vs. Normal).
+*   **Confidence**: The class with the highest probability (`argmax`) is selected.
+*   **Abstention**: The system does not currently abstain; it classifies every image provided.
 
+## 9. System Architecture
+*   **Frontend**:
+    *   **Desktop**: Python CustomTkinter (GUI).
+    *   **Web**: React.js (Demonstration Interface).
+*   **Backend**: Django (Python) - Handles API requests and result storage.
+*   **AI Inference**:
+    *   **Desktop**: Runs locally using TensorFlow/Keras (`predictions.py`).
+    *   **Web**: Currently utilizes a simulated analysis engine for demonstration purposes.
+*   **Database**:
+    *   `db.sqlite3` (Django Backend).
+    *   `image_predictions.db` (Desktop Local Cache).
+*   **Deployment**: Local execution.
 
-## Results
-### Body Part Prediction
+## 10. API Behavior (Web)
+*   **Endpoints**:
+    *   `POST /api/analysis`: Saves a new analysis result (Input: FormData with image/metadata).
+    *   `GET /api/analysis`: Retrieves past analysis results (Query: `image_name`).
+*   **Format**: JSON responses.
+*   **Error Handling**: Returns standard HTTP error codes (400 for bad request, 500 for server error).
 
-<img src="plots/BodyPartAcc.png" width=300> <img src="plots/BodyPartLoss.png" width=300>
+## 11. User Workflow
+### Desktop Application
+1.  **Launch**: User opens `mainGUI.py`.
+2.  **Upload**: User selects an X-ray image from the file dialog.
+3.  **Process**: User clicks "Predict".
+4.  **Inference**: System identifies the body part and checks for fractures.
+5.  **Result**: Display shows "Type: [Part]" and "Result: [Fractured/Normal]".
+6.  **Save**: User can save the result as a screenshot.
 
-### Fracture Prediction
-#### Elbow
+### Web Application
+1.  **Access**: User visits `http://localhost:3000`.
+2.  **Upload**: User drags & drops an image.
+3.  **Analyze**: System simulates the analysis process (ProgressBar).
+4.  **Report**: Detailed (simulated) medical report is displayed.
 
-<img src="plots/FractureDetection/Elbow/_Accuracy.jpeg" width=300> <img src="plots/FractureDetection/Elbow/_Loss.jpeg" width=300>
+## 12. Limitations
+*   **Body Part Scope**: Limited to Elbow, Hand, and Shoulder images only.
+*   **Web Inference**: The web interface is a prototype and simulates AI results; it does not currently run the live TensorFlow model.
+*   **Clinical Validation**: Not validated in a real-world clinical setting.
+*   **Image Quality**: Highly dependent on standard radiographic views; poor quality images may yield incorrect results.
 
-#### Hand
-<img src="plots/FractureDetection/Hand/_Accuracy.jpeg" width=300> <img src="plots/FractureDetection/Hand/_Loss.jpeg" width=300>
+## 13. Future Scope
+*   **Feature Extraction**: Implementation of Grad-CAM to visualize *where* the fracture is located.
+*   **Expansion**: Adding support for Wrist, Ankle, and Knee.
+*   **Real-time Web Integration**: Porting the TensorFlow model to the backend or TensorFlow.js for live web-based inference.
 
-#### Shoulder
-<img src="plots/FractureDetection/Shoulder/_Accuracy.jpeg" width=300> <img src="plots/FractureDetection/Shoulder/_Loss.jpeg" width=300>
+## 14. Setup & Execution
+### Prerequisites
+*   Python 3.9+
+*   Node.js & npm
 
+### Installation
+1.  **Create Virtual Environment**:
+    ```bash
+    python -m venv .venv
+    .\.venv\Scripts\activate
+    ```
+2.  **Install Python Dependencies**:
+    ```bash
+    pip install -r requirements_loose.txt
+    ```
+    *(Note: Use `requirements_loose.txt` for better compatibility)*
+3.  **Install Web Dependencies**:
+    ```bash
+    cd bone-fracture-web
+    npm install
+    ```
 
-# Installations
-### PyCharm IDE
-### Python v3.7.x
-### Install requirements.txt
+### Execution
+*   **Desktop App**:
+    ```bash
+    python mainGUI.py
+    ```
+*   **Web App**:
+    1.  Start Backend: `python manage.py runserver`
+    2.  Start Frontend: `cd bone-fracture-web && npm start`
 
-* customtkinter~=5.0.3
-* PyAutoGUI~=0.9.53
-* PyGetWindow~=0.0.9
-* Pillow~=8.4.0
-* numpy~=1.19.5
-* tensorflow~=2.6.2
-* keras~=2.6.0
-* pandas~=1.1.5
-* matplotlib~=3.3.4
-* scikit-learn~=0.24.2
-* colorama~=0.4.5
+## 15. Ethics, Safety & Compliance
+*   **Research Use Only**: This tool is designed for academic research and educational demonstration.
+*   **No Medical Advice**: It must not replace professional medical advice, diagnosis, or treatment.
+*   **Data Privacy**: The dataset (MURA) is anonymized. Users should be cautious when uploading private patient data to any non-compliant system.
 
-Run mainGUI.Py
-
-# GUI
-### Main
-<img src="images/GUI/main.png" width=400>
-
-### Info-Rules
-<img src="images/GUI/Rules.png" width=400>
-
-### Test Normal & Fractured
-<img src="images/GUI/normal.png" width=300> <img src="images/GUI/fractured.png" width=300>
-
-
-
+## 16. Final Validation
+Another AI can understand the entire project behavior, boundaries, and results without asking a single clarification question.

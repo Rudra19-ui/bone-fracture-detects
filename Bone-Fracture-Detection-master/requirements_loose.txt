@@ -1,0 +1,10 @@
+customtkinter
+PyAutoGUI
+PyGetWindow
+Pillow
+numpy<2
+tensorflow
+pandas
+matplotlib
+scikit-learn
+colorama

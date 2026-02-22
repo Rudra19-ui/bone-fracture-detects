@@ -70,8 +70,18 @@ class App(ctk.CTk):
         self.res2_label.pack(pady=5, padx=20)
 
         self.save_btn = ctk.CTkButton(master=self.result_frame, text="Save Result", command=self.save_result)
+        
+        # New "Show Explanation" button (Hidden by default)
+        self.heatmap_btn = ctk.CTkButton(master=self.result_frame, text="Show Explanation", command=self.show_heatmap, fg_color="purple")
+        self.current_cam_path = None
 
         self.save_label = ctk.CTkLabel(master=self.result_frame, text="")
+
+    def show_heatmap(self):
+        if self.current_cam_path and os.path.exists(self.current_cam_path):
+            im = Image.open(self.current_cam_path)
+            im.show()
+
 
 
 
@@ -94,14 +104,42 @@ class App(ctk.CTk):
     def predict_gui(self):
         global filename
         bone_type_result = predict(filename)
-        result = predict(filename, bone_type_result)
-        print(result)
-        if result == 'fractured':
-            self.res2_label.configure(text_color="RED", text="Result: Fractured", font=(ctk.CTkFont("Roboto"), 24))
+        result_data = predict(filename, bone_type_result)
+        
+        # Handle dictionary return (Safety & Explainability update)
+        if isinstance(result_data, dict):
+            # Extract fields
+            result_title = result_data['result']
+            message = result_data.get('safety_message', '')
+            prob = result_data.get('probability', 0.0)
+            cat = result_data.get('confidence_category', 'N/A')
+            self.current_cam_path = result_data.get('cam_path')
+            
+            # Format text for Clinical Audit Compliance
+            status_text = f"{result_title}\n{message}\nConfidence: {prob:.2f} ({cat})"
+            
+            # Color Logic
+            if result_title == "DETECTED":
+                color = "RED"
+            elif result_title == "LOW CONFIDENCE":
+                color = "ORANGE"
+            else: # UNCERTAIN
+                color = "#FFD700" # Gold/Yellow for Caution
+                
+            self.heatmap_btn.pack(pady=5, padx=1)
         else:
-            self.res2_label.configure(text_color="GREEN", text="Result: Normal", font=(ctk.CTkFont("Roboto"), 24))
-        bone_type_result = predict(filename, "Parts")
-        self.res1_label.configure(text="Type: " + bone_type_result, font=(ctk.CTkFont("Roboto"), 24))
+            # Fallback
+            status_text = f"Result: {result_data}"
+            color = "GREEN"
+            self.current_cam_path = None
+            self.heatmap_btn.pack_forget()
+
+        print(status_text)
+        
+        # Display Result
+        self.res2_label.configure(text_color=color, text=status_text, font=(ctk.CTkFont("Roboto"), 16))
+            
+        self.res1_label.configure(text="Body Part: " + bone_type_result, font=(ctk.CTkFont("Roboto"), 20))
         print(bone_type_result)
         self.save_btn.pack(pady=10, padx=1)
         self.save_label.pack(pady=5, padx=20)
@@ -126,5 +164,12 @@ class App(ctk.CTk):
 
 
 if __name__ == "__main__":
-    app = App()
-    app.mainloop()
+    print("Starting GUI...")
+    try:
+        app = App()
+        print("App initialized, starting mainloop...")
+        app.mainloop()
+    except Exception as e:
+        print(f"Error starting GUI: {e}")
+        import traceback
+        traceback.print_exc()

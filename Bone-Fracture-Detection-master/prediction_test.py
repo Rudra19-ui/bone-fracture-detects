@@ -50,10 +50,20 @@ def reportPredict(dataset):
           '{0: <20}'.format('Predicted Status'))
     for img in dataset:
         body_part_predict = predict(img['image_path'])
-        fracture_predict = predict(img['image_path'], body_part_predict)
+        result_data = predict(img['image_path'], body_part_predict)
+        
+        # Handle dictionary return from safety update
+        if isinstance(result_data, dict):
+            predicted_status_str = result_data['result'] # DETECTED / UNCERTAIN
+            # Use original_result for binary accuracy tracking
+            pred_label = result_data['original_result']
+        else:
+            predicted_status_str = str(result_data)
+            pred_label = result_data
+
         if img['body_part'] == body_part_predict:
             part_count = part_count + 1
-        if img['label'] == fracture_predict:
+        if img['label'] == pred_label:
             status_count = status_count + 1
             color = Fore.GREEN
         else:
@@ -63,7 +73,7 @@ def reportPredict(dataset):
               '{0: <14}'.format(img['body_part']) +
               '{0: <20}'.format(body_part_predict) +
               '{0: <20}'.format((img['label'])) +
-              '{0: <20}'.format(fracture_predict))
+              '{0: <20}'.format(predicted_status_str))
 
     print(Fore.BLUE + '\npart acc: ' + str("%.2f" % (part_count / len(dataset) * 100)) + '%')
     print(Fore.BLUE + 'status acc: ' + str("%.2f" % (status_count / len(dataset) * 100)) + '%')

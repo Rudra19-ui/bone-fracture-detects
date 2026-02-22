@@ -1,15 +1,24 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
+from tensorflow.keras.applications.resnet50 import preprocess_input
 import os
 import sqlite3
 import hashlib
+import cv2
 
 # load the models when import "predictions.py"
-model_elbow_frac = tf.keras.models.load_model("weights/ResNet50_Elbow_frac.h5")
-model_hand_frac = tf.keras.models.load_model("weights/ResNet50_Hand_frac.h5")
-model_shoulder_frac = tf.keras.models.load_model("weights/ResNet50_Shoulder_frac.h5")
-model_parts = tf.keras.models.load_model("weights/ResNet50_BodyParts.h5")
+# We wrap loading in a try-except block or ensure paths are correct. 
+# Assuming paths are relative to this file's execution context or fixed.
+# The original code used relative paths "weights/..."
+try:
+    model_elbow_frac = tf.keras.models.load_model("weights/ResNet50_Elbow_frac.h5")
+    model_hand_frac = tf.keras.models.load_model("weights/ResNet50_Hand_frac.h5")
+    model_shoulder_frac = tf.keras.models.load_model("weights/ResNet50_Shoulder_frac.h5")
+    model_parts = tf.keras.models.load_model("weights/ResNet50_BodyParts.h5")
+except Exception as e:
+    print(f"Error loading models: {e}")
+    # Fallback or exit? For now, we print error.
 
 # categories for each result by index
 
@@ -30,7 +39,8 @@ def _init_db():
             CREATE TABLE IF NOT EXISTS image_predictions (
                 image_name TEXT PRIMARY KEY,
                 part_result TEXT,
-                fracture_result TEXT
+                fracture_result TEXT,
+                image_hash TEXT
             )
             """
         )
@@ -40,12 +50,9 @@ def _init_db():
             cols = [row[1] for row in cur.fetchall()]
             if 'image_hash' not in cols:
                 conn.execute("ALTER TABLE image_predictions ADD COLUMN image_hash TEXT")
-                # Optionally create an index for faster lookup
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_image_hash ON image_predictions(image_hash)")
             # Also ensure we have an index on image_name
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_image_name ON image_predictions(image_name)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_image_hash ON image_predictions(image_hash)")
         except Exception:
-            # SQLite older versions or race conditions: ignore if ALTER TABLE not needed
             pass
     finally:
         conn.close()
@@ -64,12 +71,7 @@ def _get_cached(image_hash=None, image_name=None):
             )
             row = cur.fetchone()
             if row:
-                return {
-                    'image_name': row['image_name'],
-                    'image_hash': row['image_hash'],
-                    'part_result': row['part_result'],
-                    'fracture_result': row['fracture_result']
-                }
+                return dict(row)
         # Fallback to name lookup
         if image_name:
             cur = conn.execute(
@@ -78,12 +80,7 @@ def _get_cached(image_hash=None, image_name=None):
             )
             row = cur.fetchone()
             if row:
-                return {
-                    'image_name': row['image_name'],
-                    'image_hash': row['image_hash'],
-                    'part_result': row['part_result'],
-                    'fracture_result': row['fracture_result']
-                }
+                return dict(row)
         return None
     finally:
         conn.close()
@@ -124,27 +121,83 @@ def _save_cached(image_name, image_hash, part_result=None, fracture_result=None)
     finally:
         conn.close()
 
+# --- NEW: Explainability & Safety Logic ---
+
+def make_gradcam_heatmap(img_array, model, last_conv_layer_name="conv5_block3_out", pred_index=None):
+    """
+    Generates a Grad-CAM heatmap for the specified class index.
+    """
+    try:
+        grad_model = tf.keras.models.Model(
+            [model.inputs], [model.get_layer(last_conv_layer_name).output, model.output]
+        )
+    except ValueError:
+        # Fallback if layer name not found
+        return None
+
+    with tf.GradientTape() as tape:
+        last_conv_layer_output, preds = grad_model(img_array)
+        if pred_index is None:
+            pred_index = tf.argmax(preds[0])
+        class_channel = preds[:, pred_index]
+
+    grads = tape.gradient(class_channel, last_conv_layer_output)
+    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+    last_conv_layer_output = last_conv_layer_output[0]
+    heatmap = last_conv_layer_output @ pooled_grads[..., tf.newaxis]
+    heatmap = tf.squeeze(heatmap)
+    heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+    return heatmap.numpy()
+
+def save_gradcam(img_path, heatmap, cam_path):
+    """
+    Superimposes the heatmap on the original image and saves it.
+    """
+    if heatmap is None: return None
+    img = cv2.imread(img_path)
+    if img is None: return None
+    
+    heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
+    heatmap = np.uint8(255 * heatmap)
+    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    
+    superimposed_img = heatmap * 0.4 + img
+    cv2.imwrite(cam_path, superimposed_img)
+    return cam_path
+
 # get image and model name, the default model is "Parts"
 # Parts - bone type predict model of 3 classes
 # otherwise - fracture predict for each part
 def predict(img, model="Parts"):
     size = 224
-    # Identifier: SHA256 of file bytes (primary), and basename (fallback)
     image_name = os.path.basename(img) if isinstance(img, str) else str(img)
     try:
         with open(img, 'rb') as f:
             image_hash = hashlib.sha256(f.read()).hexdigest()
     except Exception:
         image_hash = None
+        
     cached = _get_cached(image_hash=image_hash, image_name=image_name)
+
+    # load image with 224px224p (the training model image size, rgb)
+    temp_img = image.load_img(img, target_size=(size, size))
+    x = image.img_to_array(temp_img)
+    x = np.expand_dims(x, axis=0)
+    
+    # CRITICAL IMPROVEMENT: Add proper preprocessing for ResNet50
+    x = preprocess_input(x)
 
     if model == 'Parts':
         if cached and cached.get('part_result'):
             return cached['part_result']
         chosen_model = model_parts
+        prediction = np.argmax(chosen_model.predict(x), axis=1)
+        prediction_str = categories_parts[prediction.item()]
+        _save_cached(image_name=image_name, image_hash=image_hash, part_result=prediction_str)
+        return prediction_str
     else:
-        if cached and cached.get('fracture_result'):
-            return cached['fracture_result']
+        # FRACTURE PREDICTION
+        # We skip cache to ensure we provide confidence and heatmaps
         if model == 'Elbow':
             chosen_model = model_elbow_frac
         elif model == 'Hand':
@@ -152,21 +205,62 @@ def predict(img, model="Parts"):
         elif model == 'Shoulder':
             chosen_model = model_shoulder_frac
         else:
-            chosen_model = model_parts
+            chosen_model = model_parts # Fallback
 
-    # load image with 224px224p (the training model image size, rgb)
-    temp_img = image.load_img(img, target_size=(size, size))
-    x = image.img_to_array(temp_img)
-    x = np.expand_dims(x, axis=0)
-    images = np.vstack([x])
-    prediction = np.argmax(chosen_model.predict(images), axis=1)
-
-    # chose the category and get the string prediction
-    if model == 'Parts':
-        prediction_str = categories_parts[prediction.item()]
-        _save_cached(image_name=image_name, image_hash=image_hash, part_result=prediction_str)
-    else:
-        prediction_str = categories_fracture[prediction.item()]
+        preds = chosen_model.predict(x)
+        
+        # Index 0 = Fractured, Index 1 = Normal (Alphabetical: F < N)
+        prob_fracture = preds[0][0]
+        
+        # --- MEDICAL AI SAFETY AUDIT LOGIC ---
+        # STRICT RULES:
+        # < 0.40 -> "Uncertain — Review Recommended"
+        # 0.40–0.65 -> "Low Confidence — Requires Expert Review"
+        # > 0.65 -> "Model Detected Pattern Consistent With Fracture"
+        
+        fracture_detected = False
+        confidence_category = "Low"
+        safety_message = ""
+        result_title = ""
+        
+        if prob_fracture > 0.65:
+            fracture_detected = True
+            confidence_category = "High"
+            safety_message = "Model Detected Pattern Consistent With Fracture"
+            result_title = "DETECTED"
+            prediction_str = "fractured"
+        elif 0.40 <= prob_fracture <= 0.65:
+            fracture_detected = False # Treat as negative but warn
+            confidence_category = "Moderate"
+            safety_message = "Low Confidence — Requires Expert Review"
+            result_title = "LOW CONFIDENCE"
+            prediction_str = "normal" # technically not fractured enough
+        else:
+            # < 0.40
+            fracture_detected = False
+            confidence_category = "Low" # Interpretation of fracture confidence
+            safety_message = "Uncertain — Review Recommended"
+            result_title = "UNCERTAIN"
+            prediction_str = "normal"
+            
+        # Generate Explanation (Grad-CAM)
+        # We visualize the 'fractured' class activation (index 0)
+        # Even for low confidence, we show what the model is looking at
+        heatmap = make_gradcam_heatmap(x, chosen_model, pred_index=0)
+        cam_filename = f"cam_{int(prob_fracture*100)}_{image_name}"
+        cam_path = os.path.join(os.path.dirname(img), cam_filename)
+        save_gradcam(img, heatmap, cam_path)
+        
+        # Update Cache
         _save_cached(image_name=image_name, image_hash=image_hash, fracture_result=prediction_str)
 
-    return prediction_str
+        return {
+            "result": result_title, # For GUI Main Display
+            "fracture_detected": fracture_detected,
+            "probability": float(prob_fracture),
+            "confidence_category": confidence_category,
+            "safety_message": safety_message,
+            "cam_path": cam_path,
+            "original_result": categories_fracture[np.argmax(preds)],
+            "disclaimer": "Research Prototype - Not a Diagnostic Tool"
+        }
