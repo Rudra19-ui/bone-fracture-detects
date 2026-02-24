@@ -1,4 +1,4 @@
-# 🦴 FractureAI - Advanced Bone Fracture Detection System
+# 🦴 Deep learning classification of fracture bones using ViT - Advanced Bone Fracture Detection System
 
 A comprehensive AI-powered bone fracture detection system with both web and desktop interfaces, featuring futuristic glassmorphism design and advanced medical analysis capabilities.
 

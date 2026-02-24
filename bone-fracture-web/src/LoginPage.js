@@ -51,7 +51,7 @@ const LoginPage = ({ onLogin }) => {
       </div>
 
       <div className="login-container">
-        <motion.div 
+        <motion.div
           className="login-card"
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
@@ -60,7 +60,7 @@ const LoginPage = ({ onLogin }) => {
           <div className="login-header">
             <div className="logo-section">
               <div className="logo-icon">🦴</div>
-              <h1>FractureAI</h1>
+              <h1>Deep learning classification of fracture bones using ViT</h1>
               <p>Advanced Medical AI Platform</p>
             </div>
           </div>
@@ -121,7 +121,7 @@ const LoginPage = ({ onLogin }) => {
             </div>
 
             {error && (
-              <motion.div 
+              <motion.div
                 className="error-message"
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -130,8 +130,8 @@ const LoginPage = ({ onLogin }) => {
               </motion.div>
             )}
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="login-btn"
               disabled={isLoading}
             >

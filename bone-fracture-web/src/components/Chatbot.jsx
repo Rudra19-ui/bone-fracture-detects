@@ -4,7 +4,7 @@ import './Chatbot.css';
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { id: 1, text: "Hello! I'm your FractureAI assistant. How can I help you today?", sender: 'bot' }
+    { id: 1, text: "Hello! I'm your Deep learning classification of fracture bones using ViT assistant. How can I help you today?", sender: 'bot' }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -70,7 +70,7 @@ const Chatbot = () => {
             <div className="bot-info">
               <span className="bot-avatar">🦴</span>
               <div>
-                <h4>FractureAI Assistant</h4>
+                <h4>Deep learning classification of fracture bones using ViT Assistant</h4>
                 <span className="status">Online</span>
               </div>
             </div>

@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Fracture Detection ViT",
+  "name": "Deep learning classification of fracture bones using ViT",
   "icons": [
     {
       "src": "favicon.ico",
