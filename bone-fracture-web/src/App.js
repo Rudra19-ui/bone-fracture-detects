@@ -218,7 +218,8 @@ function App() {
     // Check if this image was already analyzed (by name) and load cached result
     try {
       if (uploadedFile && uploadedFile.name) {
-        const res = await fetch(`http://localhost:8000/api/analysis?image_name=${encodeURIComponent(uploadedFile.name)}`);
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+        const res = await fetch(`${apiUrl}/api/analysis?image_name=${encodeURIComponent(uploadedFile.name)}`);
         if (res.ok) {
           const data = await res.json();
           if (data && (data.bone_type || data.report_data)) {
@@ -378,7 +379,8 @@ function App() {
       formData.append('timeline', JSON.stringify(mockResult.timeline));
       formData.append('report_data', JSON.stringify(mockResult));
 
-      const res = await fetch('http://localhost:8000/api/analysis', { method: 'POST', body: formData });
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${apiUrl}/api/analysis`, { method: 'POST', body: formData });
       if (res.ok) {
         await res.json();
         addNotification('Saved to database', 'success');

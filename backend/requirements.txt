@@ -3,6 +3,7 @@ djangorestframework
 django-cors-headers
 gunicorn
 whitenoise
+python-dotenv
 pillow
 opencv-python-headless
 numpy
