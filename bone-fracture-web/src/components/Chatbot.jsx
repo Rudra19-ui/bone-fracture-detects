@@ -27,7 +27,7 @@ const Chatbot = () => {
     setIsTyping(true);
 
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const apiUrl = process.env.REACT_APP_API_URL || 'https://bone-fracture-backend-or69.onrender.com';
       const response = await fetch(`${apiUrl}/api/chatbot/`, {
         method: 'POST',
         headers: {

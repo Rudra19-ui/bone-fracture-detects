@@ -11,7 +11,7 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -22,6 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . /app/
 
+# Make start script executable
+RUN chmod +x /app/start.sh
+
 # Collect static files
 RUN python manage.py collectstatic --noinput
 
@@ -31,5 +34,5 @@ EXPOSE 10000
 # Create persistent data directory
 RUN mkdir -p /data
 
-# Start Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", "server.wsgi:application"]
+# Start using script
+CMD ["/app/start.sh"]
