@@ -14,7 +14,7 @@ services:
   - type: web
     name: bone-fracture-detects-api
     env: python
-    buildCommand: pip install -r requirements.txt && python manage.py migrate
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt && pip list | grep google-generativeai && python manage.py migrate
     startCommand: gunicorn server.wsgi:application
     baseDir: backend
     disk:
