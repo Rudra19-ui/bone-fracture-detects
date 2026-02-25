@@ -1,0 +1,24 @@
+services:
+  # Frontend: Static Site
+  - type: static
+    name: bone-fracture-detects-web
+    env: static
+    buildCommand: npm run build
+    publishPath: build
+    baseDir: bone-fracture-web
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://bone-fracture-detects-api.onrender.com
+
+  # Backend: Django Web Service
+  - type: web
+    name: bone-fracture-detects-api
+    env: python
+    buildCommand: pip install -r requirements.txt && python manage.py migrate
+    startCommand: gunicorn server.wsgi:application
+    baseDir: backend
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: server.settings
+      - key: PYTHON_VERSION
+        value: 3.10.0
