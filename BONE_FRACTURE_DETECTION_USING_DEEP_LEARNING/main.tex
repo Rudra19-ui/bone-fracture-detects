@@ -272,15 +272,13 @@ Keywords: Artificial Intelligence, Convolutional Neural Network, Vision Transfor
 
 % ===== CHAPTER 3 =====
 \textbf{3 SYSTEM ARCHITECTURE} \dotfill 14 \\[3pt]
-\hspace{12mm}3.1 Data Acquisition Module \dotfill 14 \\
-\hspace{12mm}3.2 Data Preprocessing Module \dotfill 15 \\
-\hspace{12mm}3.3 Patch Embedding Layer \dotfill 16 \\
-\hspace{12mm}3.4 Positional Encoding \dotfill 17 \\
-\hspace{12mm}3.5 Transformer Encoder Block \dotfill 17 \\
-\hspace{12mm}3.6 Classification Head \dotfill 18 \\
-\hspace{12mm}3.7 Model Training Module \dotfill 18 \\
-\hspace{12mm}3.8 Evaluation Module \dotfill 19 \\
-\hspace{12mm}3.9 Deployment Module \dotfill 19 \\[3pt]
+\hspace{12mm}3.1 Proposed System \dotfill 14 \\
+\hspace{12mm}3.2 Dataset Details \dotfill 15 \\
+\hspace{12mm}3.3 Data Preprocessing \dotfill 16 \\
+\hspace{12mm}3.4 Model Architecture \dotfill 17 \\
+\hspace{12mm}3.5 Embedded Implementation \& Monitoring \dotfill 18 \\
+\hspace{12mm}3.6 Detailed System Architecture \dotfill 19 \\
+\hspace{12mm}3.7 Summary Flow of System Architecture \dotfill 20 \\[3pt]
 
 % ===== CHAPTER 4 =====
 \textbf{4 PERFORMANCE ANALYSIS} \dotfill 20 \\[3pt]
@@ -306,10 +304,11 @@ Keywords: Artificial Intelligence, Convolutional Neural Network, Vision Transfor
 
 \vspace{0.5cm}
 
-3.1 \hspace{5pt} System Architecture of Deep learning classification of fracture bones using ViT \dotfill 14 \\
 4.1 \hspace{5pt} VScode Logo \dotfill 23 \\
 4.2 \hspace{5pt} Google Colab Environment \dotfill 23 \\
 4.3 \hspace{5pt} Streamlite Dashboard \dotfill 23 \\
+4.4 \hspace{5pt} Proposed System Architecture and Model Performance Analysis \dotfill 28 \\
+4.5 \hspace{5pt} User Interface Dashboard showing Bone Fracture Detection Result \dotfill 30 \\
 
 \newpage
 
@@ -322,8 +321,9 @@ Keywords: Artificial Intelligence, Convolutional Neural Network, Vision Transfor
 
 \vspace{0.8cm}
 
-3.1 \hspace{5pt} Dataset Categories and Counts \dotfill 15 \\
-4.1 \hspace{5pt} Classification Metrics Summary \dotfill 20 \\
+2.1 \hspace{5pt} Summary of Literature Survey on Bone Fracture Detection and AI \dotfill 13 \\
+4.1 \hspace{5pt} Hardware Requirements for Deep learning classification of fracture bones using ViT \dotfill 24 \\
+4.2 \hspace{5pt} Software Requirements for Deep learning classification of fracture bones using ViT \dotfill 26 \\
 
 
 % ===== LIST OF ABBREVIATION =====
@@ -443,10 +443,48 @@ Attention-based CNN, Zhang et al. & 2023 & Nature & Use of Spatial Attention wit
 \chapter{SYSTEM ARCHITECTURE}
 \setstretch{1.2}
 
-\section{System Architecture}
+\section*{Methodology}
+\justifying
+FractureAI utilizes a hybrid architecture where the Frontend (React) manages user interaction, while the Backend (Django) handles image processing and orchestrates the AI Engine (TensorFlow/PyTorch). The system implements a secure RESTful API to ensure data integrity and seamless communication between the diagnostic tools and the medical personnel.
+
+The core of the system is a Vision Transformer (ViT) model trained on large-scale musculoskeletal datasets. Unlike traditional CNNs, ViTs divide images into patches and process them as sequences, allowing the model to capture global contextual information that is critical for identifying subtle fractures in complex skeletal structures.
+
+\section{Proposed System}
+The proposed system aims to provide a reliable, automated diagnostic assistant for radiologists. When an X-ray image is uploaded, the backend processes the image, runs the AI inference, and returns a binary classification result (Fracture vs. Normal) along with a confidence score. This reduces the manual workload and provides a second opinion for clinicians.
+
+The overall workflow includes image acquisition, preprocessing, AI inference, and report generation. The system also supports body part classification to ensure the correct specialized model is used for different anatomical regions such as the Wrist, Elbow, or Shoulder.
+
+\section{Dataset Details}
+The project utilizes a combined dataset from MURA (Stanford University) and the Kaggle Bone Fracture Dataset.
+\begin{enumerate}
+    \item \textbf{Total Images:} Approximately 45,000 radiograph images.
+    \item \textbf{Categories:} Balanced between Normal and Fractured cases.
+    \item \textbf{Regions:} Covers Wrist, Elbow, Finger, Forearm, Hand, Humerus, and Shoulder.
+\end{enumerate}
+
+\section{Data Preprocessing}
+To ensure model robustness and accuracy, several preprocessing steps are applied:
+\begin{enumerate}
+    \item \textbf{Resizing:} All input images are resized to 224 x 224 pixels to match the ViT input requirements.
+    \item \textbf{Normalization:} Pixel values are scaled to a range of [0, 1] for stable gradient descent.
+    \item \textbf{Augmentation:} Random rotations, horizontal flips, and brightness adjustments are used to improve generalization.
+\end{enumerate}
+
+\section{Model Architecture}
+The system employs a Vision Transformer (ViT-16) architecture:
+\begin{enumerate}
+    \item \textbf{Patch Embedding:} The 224x224 image is divided into 16x16 flattened patches.
+    \item \textbf{Transformer Encoder:} Consisting of 12 layers of Multi-Head Self-Attention to capture spatial dependencies.
+    \item \textbf{MLP Head:} A final classification layer that outputs the probability of a fracture.
+\end{enumerate}
+
+\section{Embedded Implementation \& Monitoring}
+The system is designed for high-performance inference on local workstations. Once an image is analyzed, the results are logged in a history database, and a detailed medical report is automatically generated in PDF format, including the AI findings and anatomical mapping.
+
+\section{Detailed System Architecture}
 The proposed system for Deep learning classification of fracture bones using ViT is organized into sequential modules to ensure accurate and efficient fracture detection from X-ray images.
 
-\subsection{A. Data Acquisition Module}
+\subsection*{A. Data Acquisition Module}
 This module is responsible for collecting and organizing the dataset.
 \begin{itemize}
     \item X-ray images are collected from hospitals or public medical datasets.
@@ -456,7 +494,7 @@ This module is responsible for collecting and organizing the dataset.
     \item \textbf{Purpose:} Ensure high-quality and properly labeled medical imaging data for model training.
 \end{itemize}
 
-\subsection{B. Data Preprocessing Module}
+\subsection*{B. Data Preprocessing Module}
 Preprocessing improves data quality and model performance.
 \begin{itemize}
     \item Resize images to 224 $\times$ 224 pixels.
@@ -472,19 +510,19 @@ Preprocessing improves data quality and model performance.
     \item \textbf{Purpose:} Improve generalization and reduce overfitting.
 \end{itemize}
 
-\subsection{C. Patch Embedding Layer}
+\subsection*{C. Patch Embedding Layer}
 Vision Transformer does not process entire images directly.
 \begin{itemize}
-    \item Input image is divided into fixed-size patches (e.g., 16 $\times$ 16).
+    \item Input image is divided into fixed-size patches (e.g., $16 \times 16$).
     \item Each patch is flattened into a vector.
     \item Linear projection is applied to convert patches into embeddings.
     \item A special classification token ([CLS]) is added.
-    \item If image size = 224 $\times$ 224 and patch size = 16 $\times$ 16:
+    \item If image size = $224 \times 224$ and patch size = $16 \times 16$:
     \[ \text{Number of patches} = \frac{224 \times 224}{16 \times 16} = 196 \]
     \item \textbf{Purpose:} Convert 2D image into sequence format suitable for transformer input.
 \end{itemize}
 
-\subsection{D. Positional Encoding}
+\subsection*{D. Positional Encoding}
 Transformers do not inherently understand spatial relationships.
 \begin{itemize}
     \item Learnable positional embeddings are added to each patch.
@@ -493,7 +531,7 @@ Transformers do not inherently understand spatial relationships.
     \item \textbf{Purpose:} Preserve spatial order of image patches.
 \end{itemize}
 
-\subsection{E. Transformer Encoder Block}
+\subsection*{E. Transformer Encoder Block}
 Core component of the Vision Transformer. Each encoder layer consists of:
 \begin{itemize}
     \item Multi-Head Self Attention (MHSA)
@@ -510,7 +548,7 @@ Core component of the Vision Transformer. Each encoder layer consists of:
     \item \textbf{Purpose:} Capture long-range dependencies in X-ray images.
 \end{itemize}
 
-\subsection{F. Classification Head}
+\subsection*{F. Classification Head}
 After transformer encoding:
 \begin{itemize}
     \item Extract [CLS] token output.
@@ -520,7 +558,7 @@ After transformer encoding:
     \item \textbf{Purpose:} Perform final fracture classification.
 \end{itemize}
 
-\subsection{G. Model Training Module}
+\subsection*{G. Model Training Module}
 Responsible for optimizing model performance.
 \begin{itemize}
     \item \textbf{Loss Function:} Cross-Entropy Loss
@@ -532,7 +570,7 @@ Responsible for optimizing model performance.
     \item \textbf{Purpose:} Train the model to minimize classification error.
 \end{itemize}
 
-\subsection{H. Evaluation Module}
+\subsection*{H. Evaluation Module}
 Model performance is evaluated using:
 \begin{itemize}
     \item Accuracy, Precision, Recall, F1-Score.
@@ -541,7 +579,7 @@ Model performance is evaluated using:
     \item \textbf{Purpose:} Validate reliability for medical diagnosis.
 \end{itemize}
 
-\subsection{I. Deployment Module}
+\subsection*{I. Deployment Module}
 Final trained model can be deployed as:
 \begin{itemize}
     \item Web-based application.
@@ -858,6 +896,164 @@ const FractureAnalysis = () => {
         </div>
     );
 };
+\end{lstlisting}
+
+\vspace{2em}
+\textbf{Python GUI Implementation (Desktop Application)}\\[5pt]
+
+\begin{lstlisting}[style=pythonstyle]
+import os
+from tkinter import filedialog
+import customtkinter as ctk
+import pyautogui
+import pygetwindow
+from PIL import ImageTk, Image
+
+from predictions import predict
+
+# global variables
+project_folder = os.path.dirname(os.path.abspath(__file__))
+folder_path = project_folder + '/images/'
+
+filename = ""
+
+class App(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        self.title("Bone Fracture Detection")
+        self.geometry(f"{500}x{740}")
+        self.head_frame = ctk.CTkFrame(master=self)
+        self.head_frame.pack(pady=20, padx=60, fill="both", expand=True)
+        self.main_frame = ctk.CTkFrame(master=self)
+        self.main_frame.pack(pady=20, padx=60, fill="both", expand=True)
+        self.head_label = ctk.CTkLabel(master=self.head_frame, text="Bone Fracture Detection",
+                                       font=(ctk.CTkFont("Roboto"), 28))
+        self.head_label.pack(pady=20, padx=10, anchor="nw", side="left")
+        img1 = ctk.CTkImage(Image.open(folder_path + "info.png"))
+
+        self.img_label = ctk.CTkButton(master=self.head_frame, text="", image=img1, command=self.open_image_window,
+                                       width=40, height=40)
+
+        self.img_label.pack(pady=10, padx=10, anchor="nw", side="right")
+
+        self.info_label = ctk.CTkLabel(master=self.main_frame,
+                                       text="Bone fracture detection system, upload an x-ray image for fracture detection.",
+                                       wraplength=300, font=(ctk.CTkFont("Roboto"), 18))
+        self.info_label.pack(pady=10, padx=10)
+
+        self.upload_btn = ctk.CTkButton(master=self.main_frame, text="Upload Image", command=self.upload_image)
+        self.upload_btn.pack(pady=0, padx=1)
+
+        self.frame2 = ctk.CTkFrame(master=self.main_frame, fg_color="transparent", width=256, height=256)
+        self.frame2.pack(pady=10, padx=1)
+
+        img = Image.open(folder_path + "Question_Mark.jpg")
+        img_resized = img.resize((int(256 / img.height * img.width), 256))  # new width & height
+        img = ImageTk.PhotoImage(img_resized)
+
+        self.img_label = ctk.CTkLabel(master=self.frame2, text="", image=img)
+        self.img_label.pack(pady=1, padx=10)
+
+
+        self.predict_btn = ctk.CTkButton(master=self.main_frame, text="Predict", command=self.predict_gui)
+        self.predict_btn.pack(pady=0, padx=1)
+
+        self.result_frame = ctk.CTkFrame(master=self.main_frame, fg_color="transparent", width=200, height=100)
+        self.result_frame.pack(pady=5, padx=5)
+
+        self.loader_label = ctk.CTkLabel(master=self.main_frame, width=100, height=100, text="")
+        self.loader_label.pack(pady=3, padx=3)
+
+        self.res1_label = ctk.CTkLabel(master=self.result_frame, text="")
+        self.res1_label.pack(pady=5, padx=20)
+
+        self.res2_label = ctk.CTkLabel(master=self.result_frame, text="")
+        self.res2_label.pack(pady=5, padx=20)
+
+        self.save_btn = ctk.CTkButton(master=self.result_frame, text="Save Result", command=self.save_result)
+        
+        # New "Show Explanation" button (Hidden by default)
+        self.heatmap_btn = ctk.CTkButton(master=self.result_frame, text="Show Explanation", command=self.show_heatmap, fg_color="purple")
+        self.current_cam_path = None
+
+        self.save_label = ctk.CTkLabel(master=self.result_frame, text="")
+
+    def show_heatmap(self):
+        if self.current_cam_path and os.path.exists(self.current_cam_path):
+            im = Image.open(self.current_cam_path)
+            im.show()
+
+    def upload_image(self):
+        global filename
+        f_types = [("All Files", "*.*")]
+        filename = filedialog.askopenfilename(filetypes=f_types, initialdir=project_folder+'/test/Wrist/')
+        self.save_label.configure(text="")
+        self.res2_label.configure(text="")
+        self.res1_label.configure(text="")
+        self.img_label.configure(self.frame2, text="", image="")
+        img = Image.open(filename)
+        img_resized = img.resize((int(256 / img.height * img.width), 256))  # new width & height
+        img = ImageTk.PhotoImage(img_resized)
+        self.img_label.configure(self.frame2, image=img, text="")
+        self.img_label.image = img
+        self.save_btn.pack_forget()
+        self.save_label.pack_forget()
+
+    def predict_gui(self):
+        global filename
+        bone_type_result = predict(filename)
+        result_data = predict(filename, bone_type_result)
+        
+        if isinstance(result_data, dict):
+            result_title = result_data['result']
+            message = result_data.get('safety_message', '')
+            prob = result_data.get('probability', 0.0)
+            cat = result_data.get('confidence_category', 'N/A')
+            self.current_cam_path = result_data.get('cam_path')
+            
+            status_text = f"{result_title}\n{message}\nConfidence: {prob:.2f} ({cat})"
+            
+            if result_title == "DETECTED":
+                color = "RED"
+            elif result_title == "LOW CONFIDENCE":
+                color = "ORANGE"
+            else:
+                color = "#FFD700" 
+                
+            self.heatmap_btn.pack(pady=5, padx=1)
+        else:
+            status_text = f"Result: {result_data}"
+            color = "GREEN"
+            self.current_cam_path = None
+            self.heatmap_btn.pack_forget()
+
+        self.res2_label.configure(text_color=color, text=status_text, font=(ctk.CTkFont("Roboto"), 16))
+        self.res1_label.configure(text="Body Part: " + bone_type_result, font=(ctk.CTkFont("Roboto"), 20))
+        self.save_btn.pack(pady=10, padx=1)
+        self.save_label.pack(pady=5, padx=20)
+
+    def save_result(self):
+        tempdir = filedialog.asksaveasfilename(parent=self, initialdir=project_folder + '/PredictResults/',
+                                               title='Please select a directory and filename', defaultextension=".png")
+        screenshots_dir = tempdir
+        window = pygetwindow.getWindowsWithTitle('Bone Fracture Detection')[0]
+        left, top = window.topleft
+        right, bottom = window.bottomright
+        pyautogui.screenshot(screenshots_dir)
+        im = Image.open(screenshots_dir)
+        im = im.crop((left + 10, top + 35, right - 10, bottom - 10))
+        im.save(screenshots_dir)
+        self.save_label.configure(text_color="WHITE", text="Saved!", font=(ctk.CTkFont("Roboto"), 16))
+
+    def open_image_window(self):
+        im = Image.open(folder_path + "rules.jpeg")
+        im = im.resize((700, 700))
+        im.show()
+
+if __name__ == "__main__":
+    app = App()
+    app.mainloop()
 \end{lstlisting}
 \end{document}
 
