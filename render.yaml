@@ -8,7 +8,7 @@ services:
     baseDir: bone-fracture-web
     envVars:
       - key: REACT_APP_API_URL
-        value: https://bone-fracture-frontend.onrender.com
+        value: https://bone-fracture-backend-or69.onrender.com
 
   # Backend: Django Web Service
   - type: web
