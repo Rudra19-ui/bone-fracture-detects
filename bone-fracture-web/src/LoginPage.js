@@ -149,9 +149,9 @@ const LoginPage = ({ onLogin }) => {
           <div className="login-footer">
             <div className="demo-credentials">
               <h4>Demo Credentials:</h4>
-              <p><strong>Doctor:</strong> Dr. Smith / doctor@fractureai.com / password123</p>
-              <p><strong>Radiologist:</strong> Dr. Johnson / radiologist@fractureai.com / password123</p>
-              <p><strong>Patient:</strong> John Doe / patient@fractureai.com / password123</p>
+              <p><strong>Doctor:</strong> Dr. Smith / doctor@vitfracturemodel.com / password123</p>
+              <p><strong>Radiologist:</strong> Dr. Johnson / radiologist@vitfracturemodel.com / password123</p>
+              <p><strong>Patient:</strong> John Doe / patient@vitfracturemodel.com / password123</p>
             </div>
           </div>
         </motion.div>

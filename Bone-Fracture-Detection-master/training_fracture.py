@@ -6,17 +6,72 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
+import kagglehub
 
-
-# load images to build and train the model
-#                       ....                                     /    img1.jpg
-#             test      Hand            patient0000   positive  --   img2.png
-#           /                /                         \    .....
-#   Dataset   -         Elbow  ------   patient0001
-#           \ train               \         /                           img1.png
-#                       Shoulder        patient0002     negative --      img2.jpg
-#                       ....                   \
-#
+# Helper to load external Kaggle data
+def load_kaggle_data(part):
+    try:
+        path = kagglehub.dataset_download("pkdarabi/bone-fracture-detection-computer-vision-project")
+        print(f"Kaggle data found at: {path}")
+        
+        kaggle_dataset = []
+        # Class mapping based on data.yaml
+        # 0: elbow positive, 1: fingers positive, 2: forearm fracture, 
+        # 3: humerus fracture, 4: humerus (normal), 5: shoulder fracture, 6: wrist positive
+        class_to_part = {
+            0: "Elbow", 1: "Hand", 2: "Wrist", 
+            3: "Shoulder", 4: "Shoulder", 5: "Shoulder", 6: "Wrist"
+        }
+        
+        # We only care about the requested 'part'
+        # Note: the project parts are ["Elbow", "Hand", "Shoulder"]
+        # We map Wrist/Hand to Hand, and Shoulder to Shoulder.
+        
+        for split in ['train', 'test']:
+            img_dir = os.path.join(path, "BoneFractureYolo8", split, "images")
+            label_dir = os.path.join(path, "BoneFractureYolo8", split, "labels")
+            
+            if not os.path.exists(img_dir): continue
+            
+            for img_name in os.listdir(img_dir):
+                img_path = os.path.join(img_dir, img_name)
+                label_name = os.path.splitext(img_name)[0] + ".txt"
+                label_path = os.path.join(label_dir, label_name)
+                
+                if os.path.exists(label_path):
+                    with open(label_path, 'r') as f:
+                        lines = f.readlines()
+                        if lines:
+                            # Use the first detected object's class
+                            class_idx = int(lines[0].split()[0])
+                            detected_part = class_to_part.get(class_idx, "Unknown")
+                            
+                            # Filter for the requested part
+                            # Normalize Wrist/Hand to Hand for the project's models if needed
+                            target_part = part
+                            if part == "Hand" and detected_part in ["Hand", "Wrist"]:
+                                pass # Match
+                            elif part == detected_part:
+                                pass # Match
+                            else:
+                                continue # Skip
+                                
+                            label = "fractured"
+                            if class_idx == 4: # humerus (normal)
+                                label = "normal"
+                                
+                            kaggle_dataset.append({
+                                'body_part': detected_part,
+                                'patient_id': 'kaggle_' + img_name.split('_')[0],
+                                'label': label,
+                                'image_path': img_path
+                            })
+        
+        print(f"Loaded {len(kaggle_dataset)} external images for {part}")
+        return kaggle_dataset
+    except Exception as e:
+        print(f"Kaggle parsing failed: {e}")
+        return []
 
 def load_path(path, part):
     """
@@ -57,7 +112,14 @@ def trainPart(part):
     # categories = ['fractured', 'normal']
     THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
     image_dir = THIS_FOLDER + '/Dataset/'
+    
+    # Load primary dataset
     data = load_path(image_dir, part)
+    
+    # Load external Kaggle dataset for improved accuracy
+    external_data = load_kaggle_data(part)
+    data.extend(external_data)
+    
     labels = []
     filepaths = []
 

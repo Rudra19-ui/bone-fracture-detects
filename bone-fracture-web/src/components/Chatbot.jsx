@@ -18,6 +18,14 @@ const Chatbot = () => {
     scrollToBottom();
   }, [messages, isTyping]);
 
+  const getApiBase = () => {
+    if (process.env.REACT_APP_API_URL) return process.env.REACT_APP_API_URL;
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8000';
+    // Fallback to deployed backend
+    return 'https://bone-fracture-backend-or69.onrender.com';
+  };
+
   const handleSend = async () => {
     if (!inputValue.trim()) return;
 
@@ -27,13 +35,14 @@ const Chatbot = () => {
     setIsTyping(true);
 
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'https://bone-fracture-backend-or69.onrender.com';
+      const apiUrl = getApiBase();
+      const historyPayload = messages.map(m => ({ sender: m.sender, text: m.text })).slice(-8);
       const response = await fetch(`${apiUrl}/api/chatbot/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: inputValue }),
+        body: JSON.stringify({ message: userMessage.text, history: historyPayload }),
       });
 
       if (response.ok) {
@@ -51,8 +60,9 @@ const Chatbot = () => {
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       handleSend();
     }
   };
@@ -104,9 +114,9 @@ const Chatbot = () => {
               placeholder="Ask a question..."
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
             />
-            <button onClick={handleSend} disabled={!inputValue.trim()}>
+            <button onClick={handleSend} disabled={!inputValue.trim() || isTyping}>
               ➤
             </button>
           </div>

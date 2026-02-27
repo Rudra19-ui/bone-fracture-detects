@@ -10,7 +10,11 @@ class ChatbotView(APIView):
         if not user_message:
             return Response({"error": "Message is required"}, status=status.HTTP_400_BAD_REQUEST)
         
-        bot_response = ChatbotService.get_response(user_message)
+        history = request.data.get('history') or []
+        # Ensure history is a list of {sender, text}
+        if not isinstance(history, list):
+            history = []
+        bot_response = ChatbotService.get_response(user_message, history=history)
         
         # Save to history
         ChatHistory.objects.create(

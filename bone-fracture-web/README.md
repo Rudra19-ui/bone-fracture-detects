@@ -106,9 +106,9 @@ npm start
 1. **Open your browser**
 2. **Navigate to**: `http://localhost:3000`
 3. **Login with demo credentials**:
-   - **Doctor**: `doctor@fractureai.com` / `password123`
-   - **Radiologist**: `radiologist@fractureai.com` / `password123`
-   - **Patient**: `patient@fractureai.com` / `password123`
+   - **Doctor**: `doctor@vitfracturemodel.com` / `password123`
+   - **Radiologist**: `radiologist@vitfracturemodel.com` / `password123`
+   - **Patient**: `patient@vitfracturemodel.com` / `password123`
 
 #### **🖥️ Python GUI Application**
 - The Python GUI should open automatically in a new window
